@@ -227,7 +227,8 @@ end
 -- Check the defining silhouettes, beyond finiteness and control wiring.
 do
 	local name = "Rift Gate"
-	local mod, cfg = modules[name], config.x2[name]
+	local mod, cfg = modules[name], copy(config.x2[name])
+	cfg.k19 = 1
 	local ctx = start(mod, cfg)
 	local front, back, throat = 0, 0, 0
 	for _, pos in ipairs(cloud(mod, cfg, ctx, 800)) do
@@ -239,14 +240,16 @@ do
 	end
 	check(front > 100 and back > 100 and throat > 20, "Rift Gate: both mouths and connecting throat populated")
 	for count = 1, 6 do
-		local stacked = copy(cfg)
-		stacked.k19 = count
-		local live = start(mod, stacked)
+		local scattered = copy(cfg)
+		scattered.k19 = count
+		local live = start(mod, scattered)
 		for gate = 0, count - 1 do
 			local positive, negative, middle = 0, 0, 0
+			local center = target(mod, scattered, live, gate + 1) - target(mod, scattered, live, 1)
+				+ origin + Vector3.new(0, cfg.k17, 0)
 			for slot = 1, 384 do
 				local id = gate + 1 + (slot - 1) * count
-				local pos = target(mod, stacked, live, id) - origin - Vector3.new(0, cfg.k17 + gate * cfg.k20, 0)
+				local pos = target(mod, scattered, live, id) - center
 				if pos.Z > cfg.k12 * 0.48 then positive = positive + 1 end
 				if pos.Z < -cfg.k12 * 0.48 then negative = negative + 1 end
 				if math.abs(pos.Z) < cfg.k12 * 0.1 then middle = middle + 1 end
