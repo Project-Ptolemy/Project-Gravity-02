@@ -27,11 +27,12 @@ for _, control in ipairs(Hole.Controls) do
 end
 
 -- Mixed starting positions must converge without crossing the center or
--- reversing their orbit, then fill a volume rather than a disc or hollow shell.
+-- reversing the inlet, then churn through a volume rather than a disc or shell.
 local cfg = table.clone(c); cfg.rwTilt = 0
 local ctx, population, previous, settled = { pre = {} }, {}, {}, {}
-local converges, turns_forward, rigid = true, true, true
+local converges, turns_forward, fixed_radii, changing_heights = true, true, true, 0
 local total_turns, center_sum, moments, inner = 0, Vector3.zero, Vector3.zero, 0
+local heights, dense_distance, pair_separation_change = {}, 0, 0
 Hole.px(0, cfg, ctx, x9, x1)
 for id = 1, 512 do
     local angle, radius = id * 2.399963229728653, 90 + (id * 0.754877666 % 1) * 80
@@ -49,29 +50,60 @@ for frame = 1, 360 do
         local last = previous[id]
         if point.Magnitude > last.Magnitude + 1e-6 then converges = false end
         local angle = math.atan2(last.Z * point.X - last.X * point.Z, last.X * point.X + last.Z * point.Z)
-        if angle < -1e-7 then turns_forward = false end
-        total_turns = total_turns + angle
+        if item[2].black_hole_v2.progress <= 0.5 then
+            if angle < -1e-7 then turns_forward = false end
+            total_turns = total_turns + angle
+        end
         if frame == 240 then
             settled[id] = point
+            heights[id] = { point.Y, point.Y }
             center_sum = center_sum + point
             moments = moments + point * point
             if point.Magnitude < cfg.rwBall * 0.5 then inner = inner + 1 end
         elseif frame > 240 then
-            local expected = CFrame.Angles(0, math.rad(cfg.rwBallSpin) * (frame - 240) / 60, 0) * settled[id]
-            if not near(point, expected, 1e-5) then rigid = false end
+            if math.abs(point.Magnitude - settled[id].Magnitude) > 1e-5 then fixed_radii = false end
+            heights[id][1] = math.min(heights[id][1], point.Y)
+            heights[id][2] = math.max(heights[id][2], point.Y)
+            dense_distance = dense_distance + (point - last).Magnitude
         end
         previous[id] = point
     end
+    if frame > 240 then
+        pair_separation_change = math.max(pair_separation_change,
+            math.abs((settled[1] - settled[2]).Magnitude - (previous[1] - previous[2]).Magnitude))
+    end
 end
 check(converges, "every inward path shrinks monotonically to its own core radius")
-check(turns_forward and total_turns / #population > 4 * math.pi, "infall and settled spin keep the same direction")
-check(rigid, "all settled points follow one rigid rotation without radius or latitude wobble")
-check(center_sum.Magnitude / #population < c.rwBall * 0.07, "the sphere stays centered")
+check(turns_forward and total_turns / #population > 0.5, "the inlet keeps spiraling in one direction")
+check(fixed_radii, "dense core orbits preserve each particle's radius")
+for _, height in ipairs(heights) do
+    if height[2] - height[1] > c.rwBall * 0.1 then changing_heights = changing_heights + 1 end
+end
+check(changing_heights > #population * 0.95, "settled parts move through tilted orbits instead of fixed horizontal bands")
+check(dense_distance / #population > c.rwBall * 10, "the dense core continues churning rapidly")
+check(pair_separation_change > 0.5,
+    "core particles have independent orbits rather than one rigid spinning globe")
+check(center_sum.Magnitude / #population < c.rwBall * 0.1, "the sphere stays centered")
 local variance = moments / #population
-check(math.min(variance.X, variance.Y, variance.Z) / math.max(variance.X, variance.Y, variance.Z) > 0.8,
+check(math.min(variance.X, variance.Y, variance.Z) / math.max(variance.X, variance.Y, variance.Z) > 0.7,
     "the cloud fills three dimensions evenly")
 check(inner >= 50 and inner <= 78, "the core fills the sphere's interior, including its inner eighth of volume")
 for _, point in ipairs(settled) do check(point.Magnitude <= c.rwBall + 1e-6, "no settled part escapes the sphere") end
+
+-- The every-frame core path is deliberately inexpensive at high debris counts.
+-- Count expensive calls instead of relying on machine-dependent timing limits.
+do
+    local sine, cosine, trig_calls = math.sin, math.cos, 0
+    math.sin = function(...) trig_calls = trig_calls + 1; return sine(...) end
+    math.cos = function(...) trig_calls = trig_calls + 1; return cosine(...) end
+    for _, item in ipairs(population) do
+        Hole.f2(item[1], Vector3.zero, item[2], 6, cfg, x1, ctx, x9)
+        check(item[2].angular_velocity == nil and item[2].collisions == nil,
+            "settled motion adds no self-spin motors or collision override")
+    end
+    math.sin, math.cos = sine, cosine
+    check(trig_calls == 0, "settled core uses the shared frame basis without per-part trigonometry")
+end
 
 -- A degenerate pile, a late arrival, an axis-aligned part and a moving center
 -- all use the same path, without singularities or a phase reset of other parts.
@@ -145,13 +177,44 @@ for _, ball in ipairs({ 0, 70 }) do
     for frame = 1, 120 do sample(p, d, run, settings, frame / 60) end
     local before = sample(p, d, run, settings, 2)
     x1.TimeScale = 0
-    check(near(sample(p, d, run, settings, 2), before) and d.angular_velocity.Magnitude == 0,
-        "a frozen clock stops both the orbit and the part's own spin")
+    check(near(sample(p, d, run, settings, 2), before) and d.angular_velocity == nil,
+        "a frozen clock stops dense motion without a self-spin motor")
     x1.TimeScale = -1
     local after = sample(p, d, run, settings, 2 - 1 / 60)
-    check(math.abs(after.Magnitude - before.Magnitude) < 1e-6 and d.angular_velocity.Y < 0,
-        "reverse time reverses spin without unpacking the sphere")
+    check(math.abs(after.Magnitude - before.Magnitude) < 1e-6,
+        "reverse time preserves the packed radius")
     x1.TimeScale = 1
+    check(near(sample(p, d, run, settings, 2), before), "reverse time retraces the dense orbit exactly")
+end
+
+-- Combined tilted motion and precession must fit the same physical speed
+-- budget at large radii and fast/reversed formation clocks.
+do
+    local settings, physics = table.clone(c), table.clone(x1)
+    settings.rwBall, settings.rwBallSpin, settings.rwPull = 70, 1440, 400
+    physics.MaxSpeed = 180
+    for _, scale in ipairs({ 0.25, 1, 4, -2 }) do
+        physics.TimeScale = math.abs(scale)
+        local p, d, run = part(Vector3.new(5, 12, 7)), { id = 33 }, { pre = {} }
+        local t = 0
+        Hole.px(t, settings, run, x9, physics)
+        Hole.f2(p, Vector3.zero, d, t, settings, physics, run, x9)
+        for _ = 1, 120 do
+            t = t + 1 / 60
+            Hole.px(t, settings, run, x9, physics)
+            Hole.f2(p, Vector3.zero, d, t, settings, physics, run, x9)
+        end
+        physics.TimeScale = scale
+        local _, previous_point = Hole.f2(p, Vector3.zero, d, t, settings, physics, run, x9)
+        for _ = 1, 60 do
+            t = t + scale / 60
+            Hole.px(t, settings, run, x9, physics)
+            local _, point = Hole.f2(p, Vector3.zero, d, t, settings, physics, run, x9)
+            check((point - previous_point).Magnitude * 60 <= physics.MaxSpeed * 0.75 + 1e-6,
+                "large dense core reserves speed for anchor motion at every time scale")
+            previous_point = point
+        end
+    end
 end
 
 -- Run the actual loader and engine, keeping default smoothing and damping and
@@ -200,7 +263,7 @@ for _, mobile in ipairs({ false, true }) do
         for _, control in ipairs(mod.Controls) do
             if control.Key == "rwRegrab" then Controls.activate(control, live.x2["Black Hole v2"], live.x6, live.x1) end
         end
-        local baselines, full_rate, accurate, bounded = {}, true, true, true
+        local baselines, height_ranges, full_rate, accurate, bounded = {}, {}, true, true, true
         for frame = 1, fps * 4 do
             local dt = 1 / fps
             if frame > fps * 3 then live.x6.b.Position = live.x6.b.Position + Vector3.new(15 * dt, 0, 0) end
@@ -219,10 +282,15 @@ for _, mobile in ipairs({ false, true }) do
                     if observed[p] and not near(p.Position, observed[p], 1e-5) then accurate = false end
                     if baselines[p] then
                         local baseline = baselines[p]
-                        if math.abs(offset.Magnitude - baseline.Magnitude) > 1e-4 or math.abs(offset.Y - baseline.Y) > 1e-4 then
+                        if math.abs(offset.Magnitude - baseline.Magnitude) > 1e-4 then
                             accurate = false
                         end
-                    else baselines[p] = offset end
+                        height_ranges[p][1] = math.min(height_ranges[p][1], offset.Y)
+                        height_ranges[p][2] = math.max(height_ranges[p][2], offset.Y)
+                    else
+                        baselines[p] = offset
+                        height_ranges[p] = { offset.Y, offset.Y }
+                    end
                     if offset.Magnitude > c.rwBall + 1e-4 then accurate = false end
                 end
             end
@@ -231,6 +299,9 @@ for _, mobile in ipairs({ false, true }) do
         check(full_rate, label .. ": no stale bucketed orbit targets")
         check(accurate, label .. ": actual commanded motion holds a sphere while the center moves")
         check(bounded, label .. ": constraints respect the configured speed limit")
+        local moving = 0
+        for _, range in pairs(height_ranges) do if range[2] - range[1] > c.rwBall * 0.1 then moving = moving + 1 end end
+        check(moving > #pieces * 0.9, label .. ": physical commands carry parts through all three dimensions")
     end
     local saved = {}
     for _, key in ipairs({ "k7", "k8", "Damping", "MaxSpeed" }) do saved[key] = live.x1[key] end

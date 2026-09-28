@@ -10,9 +10,11 @@ local RIDE = PhysicalProperties.new(0.7, 0.5, 0.3, 1, 1)
 function M.apply_collisions(p, d, x1)
 	local free = d.free_physics == true
 	local keep = free or x1.Disabled or x1.PreserveCollisions
-	if d.collisions ~= nil and not x1.Disabled then keep = d.collisions end
+	-- Preserve means restore the captured value, even when a shape requests
+	-- noclip. In particular, originally noncolliding parts must stay that way.
+	if d.collisions ~= nil and not x1.Disabled and not x1.PreserveCollisions then keep = d.collisions end
 	local want = keep and d.original_can_collide or false
-	if d.collisions == nil and not free and not x1.Disabled and d.pc_ride then want = true end
+	if d.collisions == nil and not free and not x1.Disabled and not x1.PreserveCollisions and d.pc_ride then want = true end
 	if p.CanCollide ~= want then p.CanCollide = want end
 	d.collision_active = d.collisions ~= nil or nil
 end

@@ -92,7 +92,7 @@ function M.f2(p, cen, d, t, c, x1, x6, x9)
 	-- config file is not bound by the panel's Min/Max, and a negative amp mirrors
 	-- the noise instead of removing it.
 	local amp = math.clamp(c.k13 or 14, 0, 100)
-	local flicker = math.clamp(c.k14 or 12, 1, 60)
+	local flicker = math.clamp(c.k14 or 12, 1, 300)
 
 	local st = x6.pre and x6.pre["Goro Goro no Mi"]
 	if not st then
@@ -265,7 +265,7 @@ M.Controls = {
 	{ Type = "Slider", Name = "Bolt Length", Min = 20, Max = 1000, Key = "k11", Default = 200 },
 	{ Type = "Slider", Name = "Node Count", Min = 4, Max = 64, Key = "k12", Default = 18, IntOnly = true },
 	{ Type = "Slider", Name = "Jaggedness", Min = 0, Max = 100, Key = "k13", Default = 14 },
-	{ Type = "Slider", Name = "Flicker Rate", Min = 1, Max = 60, Key = "k14", Default = 12 },
+	{ Type = "Slider", Name = "Flicker Rate", Min = 1, Max = 300, Key = "k14", Default = 12, ExactMax = true },
 	{ Type = "Slider", Name = "Branch Count", Min = 0, Max = 12, Key = "k15", Default = 3, IntOnly = true },
 	{ Type = "Slider", Name = "Branch Share", Min = 0, Max = 80, Key = "k16", Default = 30, Div = 100 },
 	{ Type = "Slider", Name = "Branch Length", Min = 10, Max = 100, Key = "k17", Default = 40, Div = 100 },

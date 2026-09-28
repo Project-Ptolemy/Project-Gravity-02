@@ -1,5 +1,14 @@
 # Changelog
 
+## September 28, 2026 - Effects and physics controls
+
+- Raise Goro Goro no Mi's Flicker Rate slider and runtime limit from 60 to 300.
+- Animate Storm Gyre lightning with bounded crackle waves, and keep Alien Mothership's tractor beam attached to its hull without full-length target wraps.
+- Change Black Hole v2's core to crossing, tilted orbits inspired by Dense Spin. Cache shared rotation and remove forced per-piece angular spin.
+- Make held Black Hole debris follow Preserve Collisions independently of Explosion Noclip. Preservation and disabled physics restore original collision values consistently on desktop and mobile.
+- Keep Damping active with Force Smooth, Max Fidelity and frame tracking. Use stable correction damping across the 0?5 range while preserving intended target motion.
+- Add desktop/mobile runtime regressions for damping, collision policy, core motion, lightning and beam continuity at multiple frame rates and update strides.
+
 ## September 23, 2026 - Black Hole v2 motion
 
 - Replace the spiral-to-core position blend with a continuous inward orbit that tightens into a filled sphere without reversing direction or crossing through the center.

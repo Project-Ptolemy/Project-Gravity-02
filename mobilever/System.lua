@@ -5,6 +5,7 @@ return function(context)
 	local get_shape = context.get_shape
 	local load_module = context.load_module
 	local ShapePhysics = context.shape_physics or load_module("ShapePhysics.lua")
+	context.shape_physics = ShapePhysics
 	local SUB_DIR = context.SUB_DIR or ""
 
 	local x4, x8 = {}, {}
@@ -419,12 +420,8 @@ return function(context)
 			if x1.k6 == "Light Light no Mi" then
 				et = 1
 			end
-			-- Max Fidelity is Force Smooth plus "never skip a part, never work from a
-			-- cached answer": the same dt/et/alpha collapse, always_process on top, and
-			-- every stride and budget below widened to match. Folding it into
-			-- force_smooth here is what makes it a genuine superset -- written as its
-			-- own separate condition it collapsed the timestep but left do_damping on,
-			-- so the stronger-sounding toggle was not actually the stronger one.
+			-- Max Fidelity adds uncached reads and a complete sweep to Force Smooth.
+			-- Both remove update delays; the separate Damping control still applies.
 			local max_fid = x1.MaxFidelity and true or false
 			local force_smooth = x1["Force Smooth (Lags)"] or max_fid
 			if force_smooth then
@@ -735,7 +732,9 @@ return function(context)
 			local always_process = (is_drop_shape or is_self_bounded_shape or max_fid or (cur_shape_mod and cur_shape_mod.AlwaysProcess)) and true or false
 			local base_limit = is_light_shape and 1000 or ((max_speed and not cur_no_damp) and max_speed or 3300)
 			local check_no3 = (not is_drop_shape) and (not aggressive_claim) and ghp ~= nil
-			local do_damping = damping > 0 and not cur_no_damp and not force_smooth
+			local default_damping = not cur_no_damp and math.clamp(damping, 0, 5) or 0
+			local damping_scale = 1 / (1 + default_damping)
+			local tracking_response = 1 - (1 - damping_scale) ^ (real_dt * 60)
 			local integral_on = ki > 0
 
 			-- The sweep reached both of these through x6 on every single
@@ -981,7 +980,8 @@ return function(context)
 						end
 					end
 
-					if pure_target_pos and not frame_tracking then
+					local target_velocity = ZERO_VECTOR
+					if pure_target_pos then
 						if d.last_target_pos and d.sys_last_t then
 							local actual_dt = ft - d.sys_last_t
 							if actual_dt > 0.001 then
@@ -996,12 +996,13 @@ return function(context)
 								-- out of range, so the banner never recovers. Capping the term at
 								-- the part's own speed limit keeps the smoothing for real motion
 								-- and turns a re-seat into a fast glide instead of a fling.
-								local tvel = (pure_target_pos - d.last_target_pos) / actual_dt
+								local step = frame_tracking and math.max(real_dt, 1 / 240) or actual_dt
+								local tvel = (pure_target_pos - d.last_target_pos) / step
 								local tvel_sq = tvel:Dot(tvel)
 								if tvel_sq > base_limit * base_limit then
 									tvel = tvel * (base_limit / math.sqrt(tvel_sq))
 								end
-								tv = tv + tvel
+								target_velocity = tvel
 							end
 						end
 						d.last_target_pos = pure_target_pos
@@ -1011,10 +1012,18 @@ return function(context)
 						d.sys_last_t = nil
 					end
 					
-					if not frame_tracking and (do_damping or (d.pc_phys and d.pc_phys.Damping)) then
-						local cur_damp = (d.pc_phys and d.pc_phys.Damping) or damping
-						tv = tv - (p.AssemblyLinearVelocity * cur_damp)
+					local cur_damping_scale, cur_tracking_response = damping_scale, tracking_response
+					local pc_damping = d.pc_phys and d.pc_phys.Damping
+					if pc_damping ~= nil then
+						cur_damping_scale = 1 / (1 + math.clamp(pc_damping, 0, 5))
+						if frame_tracking then
+							cur_tracking_response = 1 - (1 - cur_damping_scale) ^ (real_dt * 60)
+						end
 					end
+					-- Solve drag implicitly: subtracting last frame's measured velocity
+					-- makes damping above 1 reverse direction and amplify oscillation.
+					-- Dampen positional correction, retaining the target's own motion.
+					tv = tv * cur_damping_scale + target_velocity
 
 					-- Mirrors the global sm_alpha derivation above, including its
 					-- `>= 1 means snap` case: without that branch a per-part
@@ -1031,11 +1040,11 @@ return function(context)
 					end
 					local vl = d.vl and d.vl:Lerp(tv, cur_sm) or tv
 					if frame_tracking and pure_target_pos then
-						-- A rapid orbit needs the same response on every axis. Solve
-						-- the current target over one physics step; damping, delayed
-						-- target differences and bucket holds otherwise flatten it.
-						-- This still uses the velocity constraint and speed limits.
-						vl = (pure_target_pos - p_pos) / math.max(real_dt, 1 / 240)
+						-- Follow the orbit's movement exactly while damping only recovery
+						-- from displacement. Exponential response keeps that recovery
+						-- consistent across frame rates without flattening the sphere.
+						local correction = (pure_target_pos - p_pos) / math.max(real_dt, 1 / 240) - target_velocity
+						vl = target_velocity + correction * cur_tracking_response
 						d.integral, d.trans_vl = ZERO_VECTOR, nil
 					elseif in_transition and d.trans_vl then
 						if trans_ease < 1 then
@@ -2096,7 +2105,7 @@ return function(context)
 		if d.av then
 			d.av.MaxTorque = disabled and 0 or math.huge
 		end
-		p.CanCollide = (disabled or x1.PreserveCollisions or d.pc_ride) and d.original_can_collide or false
+		ShapePhysics.apply_collisions(p, d, x1)
 		-- LIGHT_PHYSICS is what lets the constraints throw a part around; at 0.001
 		-- density a disabled part would be shoved across the map by the first thing
 		-- that touched it instead of resting where it landed. Anchored is left alone

@@ -1,10 +1,7 @@
 -- Max Fidelity has to be honoured in BOTH runtime trees. mobilever/System.lua is a
 -- near-verbatim second copy of System.lua, so the natural failure is a change that
--- lands in one and not the other -- a desktop-only or mobile-only bug that nothing
--- else here catches. No test harness instantiates the loop, so this checks the
--- source rather than the behaviour, which is honest about what it proves: that the
--- flag is wired at every site in both trees, not that the loop then does the right
--- thing.
+-- lands in one and not the other. This checks the wiring at every site in both
+-- trees; physics_controls.lua also exercises the actual constraint loop.
 --
 -- The switch is specified as "give up every accuracy-for-speed shortcut", so the
 -- list below is the list of shortcuts. It replaces an earlier check that counted
@@ -58,11 +55,8 @@ end
 for _, path in ipairs({ "System.lua", "mobilever/System.lua" }) do
 	local src = slurp(path)
 
-	-- Max Fidelity has to be a superset of Force Smooth, not a sibling. Written as
-	-- two independent conditions it pinned dt/et and sm_alpha but left do_damping
-	-- armed, so the stronger-sounding toggle was the weaker one. Folding max_fid
-	-- into force_smooth at the declaration is what makes every later
-	-- `not force_smooth` cover it.
+	-- Fidelity controls update frequency and caching; damping remains an
+	-- independent setting in every quality mode.
 	check(src:find("local max_fid%s*=%s*x1%.MaxFidelity") ~= nil,
 		path .. ": declares `local max_fid = x1.MaxFidelity`")
 	check(src:find('local%s+force_smooth%s*=%s*x1%["Force Smooth %(Lags%)"%]%s+or%s+max_fid') ~= nil,
@@ -84,9 +78,10 @@ for _, path in ipairs({ "System.lua", "mobilever/System.lua" }) do
 	-- Shortcut 5: velocity smoothing.
 	check(src:find("if%s+force_smooth%s+then%s*\n%s*sm_alpha%s*=%s*1") ~= nil,
 		path .. ": force_smooth pins sm_alpha to 1")
-	-- Shortcut 6: damping.
-	check(src:find("do_damping%s*=[^\n]*not%s+force_smooth") ~= nil,
-		path .. ": do_damping is gated on force_smooth, so max_fid drops damping too")
+	-- Damping is a physics setting, not an accuracy shortcut.
+	check(src:find("local%s+default_damping%s*=[^\n]*not%s+cur_no_damp") ~= nil
+		and src:find("local%s+default_damping%s*=[^\n]*force_smooth") == nil,
+		path .. ": damping remains active with Force Smooth and Max Fidelity")
 
 	-- Shortcut 8: the NetworkOwnerV3 re-read stride. This one gates whether a part
 	-- is driven at all, so a cached value meant a part whose ownership had just come

@@ -807,7 +807,7 @@ return function(context)
 			es(ac, "Damping", 0, 5, x1.Damping, function(v)
 				x1.Damping = v
 				save_settings()
-			end, false, "Slows down parts to reduce jittering. Higher values = smoother but slower.")
+			end, false, "Slows recovery toward the target without slowing its orbit. Higher values settle more gently. Launch and impact modes use their own motion.")
 			es(ac, "Integral Gain", 0, 10, x1.Ki, function(v)
 				x1.Ki = v
 				save_settings()
@@ -1889,7 +1889,7 @@ return function(context)
 				et(gsc, "Force Smooth (Lags)", x1["Force Smooth (Lags)"], function(v)
 					x1["Force Smooth (Lags)"] = v
 					save_settings()
-				end, "Updates every part every frame at full smoothing, and drops damping.")
+				end, "Updates every part every frame without smoothing delays. Your Damping setting still applies.")
 				et(gsc, "Max Fidelity (Every Frame)", x1.MaxFidelity, function(v)
 					x1.MaxFidelity = v
 					save_settings()

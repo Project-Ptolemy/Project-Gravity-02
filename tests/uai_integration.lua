@@ -108,10 +108,10 @@ for _, mobile in ipairs({ false, true }) do
 	check(emitter.Enabled == false, "native particle control changes the emitter")
 	check(part.Material == Enum.Material.SmoothPlastic, "native material control changes the held part")
 	check(last_fps == 144 and not fixture.find("StatusHUD").Visible and x6.b.Color.B == 56 / 255, "FPS, HUD visibility and core color take effect immediately")
-	-- PreserveCollisions must not erase an explicit shape collision override or ride mode.
+	-- PreserveCollisions restores original values even when a shape requests noclip.
 	x1.PreserveCollisions, d.collisions = true, false
 	controls.apply_settings({ PreserveCollisions = true })
-	check(not part.CanCollide, "shape collision requests take precedence over preservation")
+	check(part.CanCollide, "preservation takes precedence over shape noclip requests")
 	d.collisions, d.pc_ride, x1.PreserveCollisions = nil, true, false
 	controls.apply_settings({ PreserveCollisions = false })
 	check(part.CanCollide, "ride collision survives preservation being disabled")
@@ -155,6 +155,7 @@ for _, prefix in ipairs({ "", "mobilever/" }) do
 	x6.a[part], x6.pc_selected[part] = d, true
 	local mod = { f2 = function() end, Controls = {} }
 	local context = { x1 = {}, x2 = { Test = {} }, x6 = x6, v1 = fixture.input, v4 = workspace, v8 = env.LocalPlayer,
+		shape_physics = assert(loadfile("ShapePhysics.lua"))(),
 		get_shape = function() coroutine.yield("loading"); return mod end }
 	assert(loadfile(prefix .. "System_partctl.lua"))()(context, {})
 	local valid, affected = true, nil

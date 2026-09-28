@@ -75,7 +75,7 @@ The engine applies these optional requests after f2 on desktop and mobile:
 | `d.free_physics = nil` | Resume control and clear stale tracking. |
 | `d.launch_velocity = velocity` | With free physics, apply one impulse and consume this field. |
 | `d.angular_velocity = Vector3.new(x, y, z)` | Set the held part's angular motor in world-space radians/second. Clear to nil for normal behavior. Pause stops it; release disables it. |
-| `d.collisions = false / true / nil` | Noclip / original collision setting / engine policy. Free parts normally use original collisions. |
+| `d.collisions = false / true / nil` | Noclip / original collision setting / engine policy. Free parts normally use original collisions. Preserve Collisions or Disabled always restores the original value, overriding this request. |
 | `d.unclaim = true` | Restore properties, remove actuators and forget the record. Defaults to zero release velocity. |
 | `d.keep_velocity = true` | Preserve current velocity when unclaiming. |
 | `d.release_velocity`, `d.release_spin` | Explicit unclaim velocities; use these instead of keep_velocity. |
@@ -84,7 +84,7 @@ Let Roblox simulate gravity after release. Do not keep LinearVelocity active and
 
 `M.NoBlend = true` opts interactive or physics-mutating modules out of blending. `M.AlwaysProcess = true` bypasses distance culling but retains processing buckets. `M.ContinuousMotion = true` supplies a shared real-time `x6.motion_offset`; add it to the target to keep a frozen pose drifting.
 
-`M.FrameTracking = true` evaluates every held part each physics frame and follows its exact target through the velocity constraint, with global/per-part speed limits. It bypasses the ordinary damping, smoothing and integral feedback that distort rapid rigid orbits. Use it with `M.NoBlend = true`, continuous targets and capture from each part's live position; it costs a full part sweep each frame. Black Hole v2 uses a shared rotation for its settled sphere to keep that sweep inexpensive. Release, collision policy and pause still apply normally.
+`M.FrameTracking = true` evaluates every held part each physics frame and follows its target through the velocity constraint, with global/per-part speed limits. It bypasses ordinary smoothing and integral feedback. Damping softens correction after a displacement while preserving the target's own motion, with consistent recovery across frame rates. Use it with `M.NoBlend = true`, continuous targets and capture from each part's live position; it costs a full part sweep each frame. Cache shared geometry in `px` as Black Hole v2 does. Release, collision policy and pause still apply normally.
 
 ## Circular mobile controls
 
@@ -122,7 +122,9 @@ Plugins must disconnect owned connections and destroy owned instances in cleanup
 
 ## Updated shapes
 
-- **Black Hole v2:** every part follows a tightening spiral into a filled sphere by default. The inlet and core turn in the same direction, with a smooth arrival and a fixed upright core axis. **Pull In Speed** controls the inward rate in nominal studs/second (default 60); **Spiral Speed** controls the incoming swirl (default 14). **Ball Spin Speed (deg/s)** defaults to 720, with a maximum of 1,440, and also drives the held pieces' angular motors. Large spheres limit their shared spin to fit the global Max Speed. **Ball Radius** eases size changes without a jump. Pull speed changes preserve progress; zero holds the current spiral radius. The optional accretion ring starts at zero. Real Regrab/Stop/Explode buttons recapture, release, or apply one outward impulse followed by gravity.
+- **Black Hole v2:** every part follows a tightening spiral into a filled sphere by default, then joins its own tilted orbit with shared precession for Dense Spin style motion. **Pull In Speed** controls the inward rate in nominal studs/second (default 60); **Spiral Speed** controls the incoming swirl (default 14). **Ball Spin Speed (deg/s)** defaults to 720, with a maximum of 1,440. The core uses positional motion without forcing each piece's angular motor to spin. Large spheres limit their combined orbital speed to fit the global Max Speed. **Ball Radius** eases size changes without a jump. Pull speed changes preserve progress; zero holds the current spiral radius. The optional accretion ring starts at zero. Held parts follow Preserve Collisions, and Explosion Noclip applies only while exploding. Regrab/Stop/Explode buttons recapture, release, or apply one outward impulse followed by gravity.
+- **Storm Gyre:** bounded waves make the lightning branches crackle without teleporting whole strikes.
+- **Alien Mothership:** the tractor beam begins at the underside emitter, with continuous local motion instead of full-length position wraps.
 - **Phoenix Ascendant:** a smooth 3D flight path with a leading head, bending body, trailing tail and wingbeats that travel through the feathers. Body Follow Through and Wing Flex tune the response.
 - **Megalodon:** a 3D patrol with swoops, tangent-aligned heading, banking and a body that bends into turns. Patrol Swoop Height, Turn Banking and Body Follow Through tune the route.
 - **Drop (archive):** gathers a canopy of debris, holds it, then releases a staggered wave. Height, spread, scatter and momentum are configurable. Import shapes-onreview/Drop.lua as a local plugin; it remains in the archive/review folder.

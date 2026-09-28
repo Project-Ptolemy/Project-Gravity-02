@@ -65,16 +65,16 @@ for _, mobile in ipairs({ false, true }) do
 		clock = clock + 1 / 60
 		fixture.run.Heartbeat:Fire(1 / 60)
 	end
-	check(record.av.AngularVelocity.X == 0 and record.av.AngularVelocity.Z == 0
-		and math.abs(record.av.AngularVelocity.Y - math.rad(ctx.x2["Black Hole v2"].rwBallSpin)) < 1e-6,
-		"the real loop applies fast core spin about a stable upright axis")
+	check(record.black_hole_v2 and record.lv.VectorVelocity.Magnitude > 0
+		and record.av.AngularVelocity.Magnitude == 0,
+		"the real loop drives the core orbit without forcing each piece to tumble")
 	ctx.x1.Paused = true
 	for _ = 1, 3 do fixture.run.Heartbeat:Fire(1 / 60) end
-	check(record.av.AngularVelocity.Magnitude == 0, "pause stops the core's angular motor")
+	check(record.lv.VectorVelocity.Magnitude <= 0.011 and record.av.AngularVelocity.Magnitude == 0, "pause stops core movement")
 	ctx.x1.Paused = false
 	clock = clock + 1 / 60
 	fixture.run.Heartbeat:Fire(1 / 60)
-	check(record.av.AngularVelocity.Magnitude > 0, "resuming restores customized core spin")
+	check(record.lv.VectorVelocity.Magnitude > 0.011 and record.av.AngularVelocity.Magnitude == 0, "resuming restores the orbit without self-spin")
 	fixture.find("rwRelease").MouseButton1Click:Fire()
 	check(record.free_active and not record.lv.Enabled, "UI Stop releases the real engine actuators")
 	x6.pc_selected[part] = true
@@ -169,7 +169,7 @@ for _, mobile in ipairs({ false, true }) do
 		stall_path, stalled = path, false
 		local init = coroutine.create(assert(loadfile("main.lua")))
 		local ok, result = coroutine.resume(init)
-		check(ok and result == "download pending", "fixture suspends initializer at " .. path)
+		check(ok and result == "download pending", "fixture suspends initializer at " .. path .. ": " .. tostring(result))
 		local destroy = assert(getgenv()._GRAVITY_DESTROY)
 		destroy()
 		ok, result = coroutine.resume(init)

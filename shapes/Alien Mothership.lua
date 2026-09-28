@@ -1,87 +1,73 @@
 local M = {}
+local NAME = "Alien Mothership"
+local TAU = math.pi * 2
+local PHI = 0.6180339887498949
+
+function M.px(t, c, x6, x9)
+	x6.pre = x6.pre or {}
+	local st = x6.pre[NAME]
+	if not st then
+		st = { phase = 0, t = t }
+		x6.pre[NAME] = st
+	end
+	st.phase = st.phase + (t - st.t) * math.max(0, c.k13 or 15) * x9.c2
+	st.t = t
+end
 
 function M.f2(p, cen, d, t, c, x1, x6, x9)
-	local wp = p.Position
-	local tc = cen - wp
-	local md = "Alien Mothership"
-	local Radius, CoreHeight, s, BeamLen = (c.k11 or 120), (c.k12 or 40), (c.k13 or 15) * x9.c2, (c.k14 or 200)
-			if not d.v1 then
-				local roll = math.random()
-				if roll < 0.6 then
-					d.v1 = 1
-				elseif roll < 0.8 then
-					d.v1 = 2
-				else
-					d.v1 = 3
-				end
-			end
-			if not d.v2 then
-				d.v2 = math.random() * math.pi * 2
-			end
-			if not d.v3 then
-				d.v3 = math.random()
-			end
-			if not d.v4 then
-				d.v4 = math.random() * math.pi * 2
-			end
-			if not d.v5 then
-				d.v5 = math.random() * 10
-			end
-			if not d.v6 then
-				d.v6 = (math.random() - 0.5) * 5
-			end
+	local id = d.slot or d.id or 1
+	local lane = (id - 1) % 10
+	local u = (id * 0.8191725133961645) % 1
+	local v = (id * 0.6710436067037893) % 1
+	local w = (id * 0.5497004779019703) % 1
+	local st = x6.pre and x6.pre[NAME]
+	local phase = st and st.phase or 0
+	local radius = math.max(1, c.k11 or 120)
+	local height = math.max(0, c.k12 or 40)
+	local beam_length = math.max(0, c.k14 or 200)
+	local x, y, z
 
-			local dt = t - (d.last_t or t)
-			d.last_t = t
-			d.phase = (d.phase or 0) + (dt * s)
-			local phase = d.phase
-			local tx, ty, tz = 0, 0, 0
+	if lane < 6 then
+		local r = radius * math.sqrt(u)
+		local angle = v * TAU + phase
+		x, z = r * math.cos(angle), r * math.sin(angle)
+		y = math.sqrt(math.max(0, 1 - u * u)) * height * (lane % 2 == 0 and 1 or -1)
+	elseif lane < 8 then
+		-- Keep a filled column from the hull's underside to the beam's foot.
+		-- Wrapping every piece from bottom to top made the velocity tracker chase
+		-- a beam-length jump and left the entire column floating below the ship.
+		-- The first beam piece anchors the emitter even with a small collection.
+		local beam_id = math.floor((id - 1) / 10) * 2 + lane - 6
+		local depth = (beam_id * PHI) % 1
+		local flow = depth + 0.025 * math.sin(depth * math.pi)
+			* math.sin(depth * TAU * 2 + phase * 4)
+		local r = math.min(10, radius * 0.1) + flow * radius * 0.4
+		local angle = v * TAU + phase * 3 - depth * TAU
+		x, z = r * math.cos(angle), r * math.sin(angle)
+		y = -height - flow * beam_length
+	else
+		local group = math.floor(u * 3)
+		local orbit = phase * 0.5 + group * TAU / 3
+		local angle = v * TAU + phase * 5
+		local r = w * 10
+		x = radius * 1.5 * math.cos(orbit) + r * math.cos(angle)
+		z = radius * 1.5 * math.sin(orbit) + r * math.sin(angle)
+		y = math.sin(phase * 2 + group) * 20 + (w - 0.5) * 5
+	end
 
-			if d.v1 == 1 then
+	local target = cen + Vector3.new(x, y, z)
+	return (target - p.Position) * (x1.k10 * x9.c1), target
+end
 
-				local r = Radius * math.sqrt(d.v3)
-				local y_curve = math.sin(math.acos(d.v3)) * CoreHeight
-				if d.v2 > math.pi then
-					y_curve = -y_curve
-				end
-
-				local rot = d.v4 + phase
-				tx = r * math.cos(rot)
-				tz = r * math.sin(rot)
-				ty = y_curve
-			elseif d.v1 == 2 then
-
-				local beam_prog = (d.v3 + phase * 2) % 1
-				ty = -CoreHeight - (beam_prog * BeamLen)
-				local beam_rad = 10 + (beam_prog * Radius * 0.4)
-				local rot = d.v2 + phase * 3
-				tx = beam_rad * math.cos(rot)
-				tz = beam_rad * math.sin(rot)
-			else
-
-				local group = math.floor(d.v3 * 3)
-				local orbit_phase = phase * 0.5 + (group * math.pi * 2 / 3)
-				local orbit_r = Radius * 1.5
-				local cx = orbit_r * math.cos(orbit_phase)
-				local cz = orbit_r * math.sin(orbit_phase)
-				local cy = math.sin(phase * 2 + group) * 20
-
-				local local_rot = d.v4 + phase * 5
-				local local_r = d.v5
-				tx = cx + local_r * math.cos(local_rot)
-				tz = cz + local_r * math.sin(local_rot)
-				 ty = cy + d.v6
-			end
-
-			local target_pos = cen + Vector3.new(tx, ty, tz)
-			return (target_pos - wp) * (x1.k10 * x9.c1), target_pos
+function M.cleanup(x6)
+	if x6.pre then x6.pre[NAME] = nil end
 end
 
 M.Controls = {
-	{ Type = "Slider", Name = "Radius", Min = 50, Max = 400, Key = "k11" },
-	{ Type = "Slider", Name = "Core Height", Min = 10, Max = 150, Key = "k12" },
-	{ Type = "Slider", Name = "Speed", Min = 1, Max = 100, Key = "k13", Div = 10 },
-	{ Type = "Slider", Name = "Beam Length", Min = 50, Max = 500, Key = "k14" }
+	{ Type = "Slider", Name = "Radius", Min = 50, Max = 400, Key = "k11", Default = 120 },
+	{ Type = "Slider", Name = "Core Height", Min = 10, Max = 150, Key = "k12", Default = 40 },
+	{ Type = "Slider", Name = "Speed", Min = 0, Max = 100, Key = "k13", Div = 10, Default = 15 },
+	{ Type = "Slider", Name = "Beam Length", Min = 50, Max = 500, Key = "k14", Default = 200 },
 }
 
 return M

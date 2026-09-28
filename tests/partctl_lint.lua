@@ -49,8 +49,9 @@ for _, path in ipairs({ "System.lua", "mobilever/System.lua" }) do
 	check(src:find("mod%.px") ~= nil or src:find("m%.px") ~= nil,
 		path .. ": it calls px on each assigned module")
 
-	check(src:find("p%.CanCollide%s*=%s*%(disabled%s+or%s+x1%.PreserveCollisions[^\n]*pc_ride") ~= nil,
-		path .. ": the disable path honours pc_ride")
+	local disabled_path = src:match("local function apply_disabled_part(.-)function x4") or ""
+	check(disabled_path:find("ShapePhysics.apply_collisions(p, d, x1)", 1, true) ~= nil,
+		path .. ": the disable path uses the shared preservation and ride collision policy")
 	check(src:find("pc_ride") ~= nil, path .. ": pc_ride is read in the runtime")
 
 	-- A shape switch tears down the module a part is assigned to and the x6.pre

@@ -6,6 +6,7 @@ return function(context, x7)
 	local v1, v4, v8 = context.v1, context.v4, context.v8
 	local x1, x6, x2 = context.x1, context.x6, context.x2
 	local get_shape = context.get_shape
+	local ShapePhysics = context.shape_physics or context.load_module("ShapePhysics.lua")
 
 	x6.pc_selected = x6.pc_selected or setmetatable({}, { __mode = "k" })
 	x6.pc_highlights = x6.pc_highlights or setmetatable({}, { __mode = "k" })
@@ -15,6 +16,16 @@ return function(context, x7)
 
 	local RIDE_PHYSICS = PhysicalProperties.new(0.7, 0.5, 0.3, 1, 1)
 	local LIGHT_PHYSICS = PhysicalProperties.new(0.001, 0, 0, 0, 0)
+	local function pc_apply_physics(part, d)
+		ShapePhysics.apply_collisions(part, d, x1)
+		if x1.Disabled or d.free_physics then
+			part.CustomPhysicalProperties = d.original_properties
+		elseif d.pc_ride then
+			part.CustomPhysicalProperties = d.original_properties or RIDE_PHYSICS
+		else
+			part.CustomPhysicalProperties = LIGHT_PHYSICS
+		end
+	end
 	local HL_COLOR = Color3.fromRGB(255, 170, 0)
 	-- Selected, and what it is doing. The panel could only ever say "3 selected,
 	-- 7 overridden"; the colour is what tells you which of the boxes in front of you
@@ -124,15 +135,6 @@ return function(context, x7)
 		end
 		pc_unref_mod(d)
 		if d.pc_mode and x7.reset_scratch then x7.reset_scratch(d) end
-		if d.pc_ride then
-			-- Hand the part back to the same rule f2/apply_disabled_part uses, so a
-			-- part whose original state was collidable and PreserveCollisions is on
-			-- does not come out of ride mode permanently pass-through.
-			pcall(function()
-				part.CanCollide = (x1.PreserveCollisions and d.original_can_collide) or false
-				part.CustomPhysicalProperties = LIGHT_PHYSICS
-			end)
-		end
 		d.pc_mode = nil
 		d.pc_target = nil
 		d.pc_shape = nil
@@ -140,6 +142,7 @@ return function(context, x7)
 		d.pc_cfg = nil
 		d.pc_phys = nil
 		d.pc_ride = nil
+		pcall(pc_apply_physics, part, d)
 		-- Back to plain selection orange. A released part that is still selected has
 		-- to stop claiming it is pinned.
 		pc_paint_highlight(part)
@@ -462,23 +465,7 @@ return function(context, x7)
 
 					if opts.ride ~= nil then
 						d.pc_ride = opts.ride and true or false
-						if d.pc_ride then
-							pcall(function()
-								if part.CanCollide ~= true then
-									part.CanCollide = true
-								end
-								local props = d.original_properties or RIDE_PHYSICS
-								part.CustomPhysicalProperties = props
-							end)
-						else
-							pcall(function()
-								local want = (x1.PreserveCollisions and d.original_can_collide) or false
-								if part.CanCollide ~= want then
-									part.CanCollide = want
-								end
-								part.CustomPhysicalProperties = LIGHT_PHYSICS
-							end)
-						end
+						pcall(pc_apply_physics, part, d)
 					end
 				end
 				-- After the mode has settled, so the box takes the colour of what the
@@ -507,23 +494,7 @@ return function(context, x7)
 			local d = x6.a and x6.a[part]
 			if d then
 				d.pc_ride = on
-				pcall(function()
-					if on then
-						if part.CanCollide ~= true then
-							part.CanCollide = true
-						end
-						part.CustomPhysicalProperties = d.original_properties or RIDE_PHYSICS
-					else
-						-- The same rule f2 and apply_disabled_part use, so a part whose
-						-- original state was collidable does not come out of ride mode
-						-- permanently pass-through.
-						local want = (x1.PreserveCollisions and d.original_can_collide) or false
-						if part.CanCollide ~= want then
-							part.CanCollide = want
-						end
-						part.CustomPhysicalProperties = LIGHT_PHYSICS
-					end
-				end)
+				pcall(pc_apply_physics, part, d)
 				count = count + 1
 			end
 		end

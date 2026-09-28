@@ -261,6 +261,28 @@ do
 	set_mouse(Vector3.new(140, 8, 40))
 end
 
+-- The slider and runtime must agree on the raised cap. A new processing
+-- generation can reroll before the former 60 Hz interval has elapsed.
+do
+	for _, control in ipairs(S.Controls) do
+		if control.Key == "k14" then check(control.Max == 300, "flicker slider allows 300") end
+	end
+	for _, rate in ipairs({ 300, 1000 }) do
+		local run, c = mk_x6(), cfg({ k14 = rate })
+		run.f = 4
+		S.f2(part(), Vector3.zero, { id = 17 }, 1, c, x1, run, x9)
+		local state = run.pre["Goro Goro no Mi"]
+		local seed = state.seed
+		run.f = 8
+		S.f2(part(), Vector3.zero, { id = 17 }, 1.002, c, x1, run, x9)
+		check(state.seed == seed, "flicker does not exceed the 300 cap")
+		run.f = 12
+		local velocity, target = S.f2(part(), Vector3.zero, { id = 17 }, 1.004, c, x1, run, x9)
+		check(state.seed == seed + 1 and finite(velocity) and finite(target), "300 flicker rerolls within 4 ms with finite motion")
+		S.cleanup(run)
+	end
+end
+
 print("Goro Goro no Mi · hold to fire and cleanup")
 do
 	local cen = Vector3.new(0, 10, 0)

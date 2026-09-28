@@ -18,14 +18,22 @@ Project Gravity is a Roblox script that grabs unanchored parts and moves them ar
 ### Shape and plugin update
 
 **Black Hole v2** draws parts through a tightening spiral into a densely filled sphere.
-The spiral flows continuously into a fast, stable rotation about one upright axis.
+The spiral flows into fast, crossing 3D orbits inspired by Dense Spin. The core
+stays densely filled while each piece travels through changing heights.
 **Pull In Speed** controls how quickly parts arrive; **Spiral Speed** controls the
 incoming swirl. **Ball Spin Speed (deg/s)** defaults to 720 (two turns per second),
 with a maximum of 1,440. Large cores respect the global Max Speed limit.
 **Ball Radius** resizes the sphere smoothly; zero pulls everything to the center.
 The optional **Accretion Ring %** starts at zero so every part joins the sphere.
 Use its **Regrab All Parts**, **Stop Grabbing** and **Explode** buttons to recapture,
-release or launch debris. Released parts follow normal gravity and keep their momentum.
+release or launch debris. Released parts follow normal gravity and keep their momentum. Held parts follow
+**Preserve Collisions**; **Explosion Noclip** only affects the explosion. Preserving
+collisions always restores each part's original collision setting.
+
+**Storm Gyre** lightning crackles along its branches, and **Alien Mothership**
+keeps its flowing tractor beam attached to the underside of the ship. **Damping**
+now controls settling even with Force Smooth or Max Fidelity enabled, without
+slowing the formation's intended motion.
 
 **Phoenix Ascendant** now bends through turns from head to tail, with wingbeats
 traveling through the feathers. **Megalodon** follows a banked 3D patrol with swoops
@@ -116,6 +124,8 @@ to run the suites, including modules using `continue` and Unicode filenames:
 ```powershell
 python tools/test_luau.py --luau PATH_TO_LUAU tests/plugin_actions.lua
 python tools/test_luau.py --luau PATH_TO_LUAU tests/black_hole_motion.lua
+python tools/test_luau.py --luau PATH_TO_LUAU tests/physics_controls.lua
+python tools/test_luau.py --luau PATH_TO_LUAU tests/storm_mothership_motion.lua
 python tools/test_luau.py --luau PATH_TO_LUAU tests/mobile_controls.lua
 python tools/test_luau.py --luau PATH_TO_LUAU tests/session_lifecycle.lua
 python tools/test_luau.py --luau PATH_TO_LUAU tests/uai_integration.lua

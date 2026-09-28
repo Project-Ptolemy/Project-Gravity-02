@@ -28,6 +28,7 @@ end
 local function mk_ctx(x6)
 	return {
 		x1 = { PartCtlMultiSelect = false, k3 = nil },
+		shape_physics = assert(loadfile("ShapePhysics.lua"))(),
 		x6 = x6,
 		v1 = env.svc("UserInputService"),
 		v4 = env.svc("Workspace"),

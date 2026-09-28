@@ -112,29 +112,30 @@ for frame = 1, 240 do
 	if frame > 180 then ball_points[#ball_points + 1] = point end
 end
 Physics.apply(spinning, spin_d, x1)
--- The finished ball spins about a single upright axis at the configured speed;
--- nothing leaks onto X or Z, so it reads as a stable spinning globe.
+-- Dense Spin-style motion uses independent tilted positional orbits. Driving
+-- every piece's angular motor adds contact work without improving that motion.
 check(c.rwBallSpin >= 360, "the default core completes at least one revolution per second")
-check(near(spin_d.av.AngularVelocity, Vector3.new(0, math.rad(c.rwBallSpin), 0), 1e-3),
-	"the gathered ball spins about one upright axis at the slider speed")
-local radius0, height0 = ball_points[1].Magnitude, ball_points[1].Y
+check(spin_d.angular_velocity == nil and not spin_d.angular_active,
+	"dense motion needs no per-part angular motor request")
+local radius0, ymin, ymax = ball_points[1].Magnitude, ball_points[1].Y, ball_points[1].Y
 local steady = true
 for _, point in ipairs(ball_points) do
-	if math.abs(point.Magnitude - radius0) > 1e-3 or math.abs(point.Y - height0) > 1e-3 then steady = false end
+	if math.abs(point.Magnitude - radius0) > 1e-3 then steady = false end
+	ymin, ymax = math.min(ymin, point.Y), math.max(ymax, point.Y)
 end
-check(steady, "a settled ball part holds a constant radius and height while it spins")
+check(steady and ymax - ymin > radius0 * 0.2, "a settled part keeps its radius while spinning through three dimensions")
 -- One slider controls the spin speed.
 local speed_control = table.clone(c)
 speed_control.rwBallSpin = 360
-BlackHoleV2.px(4.001, speed_control, spin_ctx)
-BlackHoleV2.f2(spinning, Vector3.zero, spin_d, 4.001, speed_control, x1, spin_ctx, x9)
-Physics.apply(spinning, spin_d, x1)
-check(near(spin_d.av.AngularVelocity, Vector3.new(0, math.rad(360), 0), 1e-3),
-	"a single slider sets the ball spin speed")
-spin_d.angular_velocity = nil
-Physics.apply(spinning, spin_d, x1)
-check(near(spin_d.av.AngularVelocity, Vector3.zero) and not spin_d.angular_active,
-	"clearing shape spin restores the normal angular motor")
+local phase = spin_ctx.pre["Black Hole v2"].ball_angle
+BlackHoleV2.px(4.1, speed_control, spin_ctx)
+check(math.abs(spin_ctx.pre["Black Hole v2"].ball_angle - phase - math.rad(360) * 0.1) < 1e-6,
+	"the slider changes orbit speed without resetting its phase")
+speed_control.rwBallSpin = 0
+local _, still = BlackHoleV2.f2(spinning, Vector3.zero, spin_d, 4.1, speed_control, x1, spin_ctx, x9)
+BlackHoleV2.px(4.2, speed_control, spin_ctx)
+local _, held = BlackHoleV2.f2(spinning, Vector3.zero, spin_d, 4.2, speed_control, x1, spin_ctx, x9)
+check(near(still, held), "zero ball spin stops both tilted orbit and precession")
 
 -- Isolate the approach from the optional ball radius, tilt and ring.
 local approach = table.clone(c)

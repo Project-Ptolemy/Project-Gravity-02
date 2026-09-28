@@ -20,7 +20,6 @@ function M.f2(p, cen, d, t, c, x1, x6, x9)
 	local pick = (id * PHI) % 1
 	local u = (id * 0.8191725133961645) % 1
 	local v = (id * 0.6710436067037893) % 1
-	local w = (id * 0.5497004779019703) % 1
 	local st = x6.pre and x6.pre[NAME]
 	local phase = st and st.phase or 0
 
@@ -51,11 +50,17 @@ function M.f2(p, cen, d, t, c, x1, x6, x9)
 	else
 		local bolt = (id - 1) % 7
 		local angle = bolt * TAU / 7 + phase * 0.09
-		-- Spatial harmonics make a forked lightning silhouette without drawing a
-		-- new random path every frame, which would fling blocks between strikes.
-		local jag = radius * (0.1 * math.sin(u * 7 * math.pi) + 0.055 * math.sin(u * 17 * math.pi))
+		-- Keep each bolt attached to the cloud while short, overlapping waves
+		-- crackle along it. These continuous local bends are fast enough to read
+		-- as lightning without rerolling a path or flinging debris between bolts.
+		local pulse = phase * 32 + bolt * 2.399963229728653
+		local envelope = math.sin(u * math.pi)
+		local jag = radius * (0.1 * math.sin(u * 7 * math.pi + math.sin(pulse) * envelope)
+			+ 0.055 * math.sin(u * 17 * math.pi - pulse * 1.37) * envelope)
+		local fork = radius * 0.075 * envelope * math.sin(u * 11 * math.pi + pulse)
 		local r = (radius + (funnels == 1 and 0 or spread)) * 0.85 + jag
-		x, z = r * math.cos(angle), r * math.sin(angle)
+		x = r * math.cos(angle) - fork * math.sin(angle)
+		z = r * math.sin(angle) + fork * math.cos(angle)
 		y = height - lightning * u
 	end
 	local target = cen + Vector3.new(x, y + math.clamp(c.k16 or 65, -100, 500), z)

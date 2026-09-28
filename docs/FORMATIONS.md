@@ -80,12 +80,17 @@ these offline checks do not establish retention in a live NDS server.
   Through %** carries the turn down the spine to the tail. Path frames are cached
   once per formation frame; late claims join the same pose.
 - **Black Hole v2:** a tightening spiral draws every part into a filled sphere.
-  Parts keep their direction of rotation as they enter, then hold a constant
-  radius and height. **Pull In Speed** sets the inward rate; **Spiral Speed** sets
-  the swirl. **Ball Spin Speed (deg/s)** defaults to 720 about one stable upright
-  axis. Radius changes ease smoothly, and an accretion ring is optional.
+  Each piece follows a tilted orbit through changing heights, with shared
+  precession for Dense Spin style motion. **Pull In Speed** sets the inward rate;
+  **Spiral Speed** sets the swirl. **Ball Spin Speed (deg/s)** defaults to 720.
+  Radius changes ease smoothly, and an accretion ring is optional. Held debris
+  follows Preserve Collisions; individual angular motors are not forced to spin.
   Real buttons regrab, release or explode the tracked parts; gravity acts with
   the actuators disabled after an explosion.
+- **Storm Gyre:** lightning crackles along its branches with continuous, bounded
+  displacement, keeping strikes recognizable while they move.
+- **Alien Mothership:** a persistent emitter attaches the tractor beam to the hull.
+  Local waves flow along the beam without wrapping parts across its full length.
 - **Drop (review/archive):** gathers a distributed canopy smoothly, holds it, then
   releases a configurable staggered wave. **Drop Now** starts the wave early;
   downward speed, scatter and incoming momentum control the release.

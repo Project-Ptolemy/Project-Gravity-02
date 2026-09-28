@@ -1,2 +1,4 @@
 # Auto detect text files and perform LF normalization
 * text=auto
+# Match the exact LF text embedded as JSON by sync_plugin_docs.py.
+docs/plugins/plugin-prompt.txt text eol=lf
