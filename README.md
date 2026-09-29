@@ -4,7 +4,7 @@ Project Gravity is a Roblox script that grabs unanchored parts and moves them ar
 
 ## Features
 - Grabs unanchored parts automatically
-- Has 75 active shapes, including Black Hole v2 and 15 formations designed around uneven disaster debris
+- Has 117 active shapes, including 42 new moving formations and Black Hole v2
 - Works on both Desktop and Mobile
 - Let's you tweak speed, damping, and other physics live
 - Formation controls in the Advanced panel: slow down or reverse the shape's clock, mix two
@@ -14,6 +14,29 @@ Project Gravity is a Roblox script that grabs unanchored parts and moves them ar
 - Saves your settings automatically
 - Shape plugins support real action buttons and circular mobile steering
 - The UI's **X** fully unloads the session, including the core, constraints and keybinds
+
+### Thirty vast formations
+
+Thirty additional shapes focus on enormous structures and fields: **Constellation
+Lattice, Event Horizon Array, Parallax Grid, Continental Conveyor, Worldbreaker
+Wheel, Guillotine Array, Continental Shelf, Polar Rift**, and more. Each has a
+distinct structure and motion, with five to seven controls. Networks flex and
+exchange debris, machinery rolls and strikes, and terrain fronts advance.
+
+**[Explore all thirty with motion previews](docs/VAST.md).**
+
+### Twelve moving disasters
+
+**Tsunami** forms twin curling breakers with a moving shoreline. **Killer** drives
+fast staggered debris volleys through the core and curves them back for another pass.
+Both are based on the drawings in recommendations.
+
+Ten more large shapes join them: **Cataclysm Dragon, Thunderbird, Abyssal Maw,
+Dreadnought, Titan Stampede, Rift Reaper, Extinction Comet, Faultline, Eruption,
+and Oblivion Drill**. They charge, dive, bite, break and sweep through broad paths,
+with seven simple controls each. Select them by name on desktop or mobile.
+
+**[Watch all twelve move and see the controls](docs/DISASTERS.md).**
 
 ### Shape and plugin update
 

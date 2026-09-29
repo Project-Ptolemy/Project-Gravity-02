@@ -19,7 +19,7 @@ import subprocess
 import tempfile
 
 from PIL import Image, ImageDraw, ImageFont, ImageSequence
-from shape_catalog import CAPTIONS, GROUPS, NEW_SHAPES, PRESETS, VIEWS
+from shape_catalog import CAPTIONS, DISASTER_SHAPES, GROUPS, NEW_SHAPES, PRESETS, VAST_SHAPES, VIEWS
 
 ROOT = Path(__file__).resolve().parents[1]
 BACKGROUND = (13, 20, 31)
@@ -186,10 +186,10 @@ def panel(name, data, frame, size, mode, time, camera, meshes):
         for _, poly, color in sorted(polygons, key=lambda v: v[0]):
             draw.polygon([screen(p) for p in poly], fill=color)
     draw.text((22, 17), name, font=fit_font(name, size - 44, 22), fill=(235, 242, 248))
-    tag = "REVIEW" if data["review"] else ("NEW" if name in NEW_SHAPES else "ACTIVE")
+    tag = "REVIEW" if data["review"] else ("NEW" if name in (*NEW_SHAPES, *DISASTER_SHAPES, *VAST_SHAPES) else "ACTIVE")
     label = data["labels"][frame]
     if label == "Fixed core":
-        label = "Continuous orbit" if data["continuous_motion"] else "Fixed core"
+        label = "Active motion" if data["continuous_motion"] else "Fixed core"
     info = f"{tag}  /  {label}"
     draw.text((22, 48), info, font=fit_font(info, size - 44, 12), fill=(119, 180, 192))
     caption = CAPTIONS.get(name, "Shape motion")
@@ -252,7 +252,9 @@ def trajectory_stats(data):
 
 
 def write_gallery_index(directory, entries, args):
-    lines = ["# Shape motion gallery", "", "All **78 shapes**, in **13 GIFs with six shapes each**: 74 active and four review modules.", "",
+    total = sum(len(names) for _, names, _, _ in entries)
+    reviews = sum(item["review"] for _, _, data, _ in entries for item in data.values())
+    lines = ["# Shape motion gallery", "", f"All **{total} shapes**, in **{len(entries)} GIFs with up to six shapes each**: {total - reviews} active and {reviews} review modules.", "",
              f"Each clip shows {args.duration:g} seconds at {args.frames / args.duration:g} fps, using {args.parts} uneven pieces per shape. "
              "Bricks, planks, beams and wall panels keep the same identities and illustrative orientations throughout. Cyan pieces help track the motion.", "",
              "The sampler executes the actual Lua modules with persistent records and 60 Hz updates. Cameras stay fixed across each clip. "
@@ -274,7 +276,7 @@ def write_gallery_index(directory, entries, args):
         records = []
         for name in names:
             item = data[name]
-            mark = " (review)" if item["review"] else (" (new)" if name in NEW_SHAPES else "")
+            mark = " (review)" if item["review"] else (" (new)" if name in (*NEW_SHAPES, *DISASTER_SHAPES, *VAST_SHAPES) else "")
             lines.append(f"| {name}{mark} | {CAPTIONS[name]} |")
             records.append(dict(name=name, source=source_path(name).relative_to(ROOT).as_posix(),
                                 review=item["review"], fixture=item["fixture"], method=item["method"],
@@ -359,7 +361,7 @@ def main():
     if args.all:
         catalog = [name for _, shapes in GROUPS for name, _ in shapes]
         files = [p.stem for folder in ("shapes", "shapes-onreview") for p in (ROOT / folder).glob("*.lua")]
-        if len(catalog) != len(set(catalog)) or set(catalog) != set(files) or any(len(entries) != 6 for _, entries in GROUPS):
+        if len(catalog) != len(set(catalog)) or set(catalog) != set(files) or any(not 1 <= len(entries) <= 6 for _, entries in GROUPS):
             raise SystemExit(f"Update shape_catalog.py: missing={set(files) - set(catalog)}, extra={set(catalog) - set(files)}")
     entries, covers = existing_gallery(args) if args.group else [], []
     for index, (title, shapes) in enumerate(groups, 1):

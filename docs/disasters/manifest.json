@@ -1,0 +1,213 @@
+{
+  "runtime": "lune 0.10.5",
+  "parts": 512,
+  "frames": 96,
+  "duration": 8,
+  "simulation_hz": 60,
+  "groups": [
+    {
+      "title": "Breakers and hunters",
+      "gif": "motion-01.gif",
+      "shapes": [
+        {
+          "name": "Tsunami",
+          "config": {
+            "k11": 220,
+            "k12": 180,
+            "k13": 24,
+            "k14": 300,
+            "k15": 70,
+            "k16": 110,
+            "k17": -20
+          },
+          "source_fingerprint": "c37d80ecad2c86a110a0ea05b6c1a8805f8710580849aac3264b6dea3e9b5635",
+          "moving_parts": 512,
+          "max_displacement": 295.129,
+          "distinct_frames": 96
+        },
+        {
+          "name": "Killer",
+          "config": {
+            "k11": 240,
+            "k12": 8,
+            "k13": 36,
+            "k14": 18,
+            "k15": 150,
+            "k16": 100,
+            "k17": 8
+          },
+          "source_fingerprint": "177bfa0eefd6ac11915d882b5ff7f950991acec8e35932e3690c7afb0548869f",
+          "moving_parts": 512,
+          "max_displacement": 314.195,
+          "distinct_frames": 96
+        },
+        {
+          "name": "Cataclysm Dragon",
+          "config": {
+            "k11": 420,
+            "k12": 230,
+            "k13": 20,
+            "k14": 36,
+            "k15": 125,
+            "k16": 190,
+            "k17": 65
+          },
+          "source_fingerprint": "4ed9596519ff6105e9e6796f3010d5850dfd9138c718087215cbd07df5aadef7",
+          "moving_parts": 512,
+          "max_displacement": 705.933,
+          "distinct_frames": 96
+        },
+        {
+          "name": "Thunderbird",
+          "config": {
+            "k11": 245,
+            "k12": 280,
+            "k13": 24,
+            "k14": 38,
+            "k15": 145,
+            "k16": 210,
+            "k17": 85
+          },
+          "source_fingerprint": "8bf1407351b636dd4879ea291fae2bb47988057cd5a4a5a91ecf4b701dff4703",
+          "moving_parts": 512,
+          "max_displacement": 729.875,
+          "distinct_frames": 96
+        },
+        {
+          "name": "Abyssal Maw",
+          "config": {
+            "k11": 135,
+            "k12": 380,
+            "k13": 26,
+            "k14": 65,
+            "k15": 80,
+            "k16": 105,
+            "k17": 180
+          },
+          "source_fingerprint": "69e4d46efec12f507f241deb37cb26f34712628c0ec0ad01fe54a99198bd2147",
+          "moving_parts": 512,
+          "max_displacement": 955.287,
+          "distinct_frames": 96
+        },
+        {
+          "name": "Dreadnought",
+          "config": {
+            "k11": 420,
+            "k12": 180,
+            "k13": 18,
+            "k14": 110,
+            "k15": 55,
+            "k16": 170,
+            "k17": 150
+          },
+          "source_fingerprint": "52de42605ad9ea6ff2735e0cf0fed70b2028cb71b93545e0284f48d62f160f3f",
+          "moving_parts": 512,
+          "max_displacement": 727.254,
+          "distinct_frames": 96
+        }
+      ]
+    },
+    {
+      "title": "Map-scale disasters",
+      "gif": "motion-02.gif",
+      "shapes": [
+        {
+          "name": "Titan Stampede",
+          "config": {
+            "k11": 110,
+            "k12": 165,
+            "k13": 26,
+            "k14": 85,
+            "k15": 90,
+            "k16": 210,
+            "k17": 60
+          },
+          "source_fingerprint": "01f93976a83d1a8ca5d40740985fea8743240f830091cab38381d30c63eda2dd",
+          "moving_parts": 512,
+          "max_displacement": 714.966,
+          "distinct_frames": 96
+        },
+        {
+          "name": "Rift Reaper",
+          "config": {
+            "k11": 100,
+            "k12": 240,
+            "k13": 12,
+            "k14": 210,
+            "k15": 220,
+            "k16": 135,
+            "k17": 6
+          },
+          "source_fingerprint": "0638d1ee77e671007aa9d64bd347d5b1f38f2a98b89d5e11a7a990a8c052f1b2",
+          "moving_parts": 512,
+          "max_displacement": 594.456,
+          "distinct_frames": 96
+        },
+        {
+          "name": "Extinction Comet",
+          "config": {
+            "k11": 70,
+            "k12": 310,
+            "k13": 16,
+            "k14": 95,
+            "k15": 230,
+            "k16": 180,
+            "k17": 50
+          },
+          "source_fingerprint": "c5cb3014748fb6ebdbfa9b0a4133f4b0e0fb20fc242f3aec64bc11b64ca18bd4",
+          "moving_parts": 512,
+          "max_displacement": 551.98,
+          "distinct_frames": 96
+        },
+        {
+          "name": "Faultline",
+          "config": {
+            "k11": 480,
+            "k12": 140,
+            "k13": 12,
+            "k14": 90,
+            "k15": 210,
+            "k16": 0,
+            "k17": 11
+          },
+          "source_fingerprint": "6ab2a05b40b923d86822ad8fca535b7a84d0727fe03f8964d4f4bdb42f580fcb",
+          "moving_parts": 512,
+          "max_displacement": 263.943,
+          "distinct_frames": 96
+        },
+        {
+          "name": "Eruption",
+          "config": {
+            "k11": 85,
+            "k12": 250,
+            "k13": 10,
+            "k14": 300,
+            "k15": 75,
+            "k16": 160,
+            "k17": 0
+          },
+          "source_fingerprint": "9b94804d4a08fec9a49eb3c540be9dc165f15b7743e5b6ac9365955d5c2dd38e",
+          "moving_parts": 512,
+          "max_displacement": 401.287,
+          "distinct_frames": 96
+        },
+        {
+          "name": "Oblivion Drill",
+          "config": {
+            "k11": 105,
+            "k12": 380,
+            "k13": 20,
+            "k14": 3,
+            "k15": 250,
+            "k16": 95,
+            "k17": 65
+          },
+          "source_fingerprint": "f2b8f8cd827bda569188bdc7d485d0628faa64f6f5223bcde912d4fa5bd255ff",
+          "moving_parts": 512,
+          "max_displacement": 508.267,
+          "distinct_frames": 96
+        }
+      ]
+    }
+  ]
+}

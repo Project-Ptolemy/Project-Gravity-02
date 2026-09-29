@@ -18,3 +18,7 @@ __pycache__/
 !.env.example
 !docs/PLUGINS.md
 !docs/plugins/
+!docs/DISASTERS.md
+!docs/disasters/
+!docs/VAST.md
+!docs/vast/

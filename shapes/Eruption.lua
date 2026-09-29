@@ -1,0 +1,75 @@
+local M = { ContinuousMotion = true, AlwaysProcess = true }
+local NAME = "Eruption"
+local TAU = math.pi * 2
+local PHI = 0.6180339887498949
+
+function M.px(t, c, x6, x9)
+	x6.pre = x6.pre or {}
+	local st = x6.pre[NAME]
+	if not st then
+		st = { phase = 0, t = t }
+		x6.pre[NAME] = st
+	end
+	st.phase = st.phase + (t - st.t) * math.clamp(c.k13 or 10, 0, 45) * x9.c2
+	st.t = t
+end
+
+function M.f2(p, cen, d, t, c, x1, x6, x9)
+	local id = d.slot or d.id or 1
+	local pick = (id * PHI) % 1
+	local u, v, w = (id * 0.8191725133961645) % 1, (id * 0.6710436067037893) % 1, (id * 0.5497004779019703) % 1
+	local st = x6.pre and x6.pre[NAME]
+	local phase = st and st.phase or 0
+	local crater = math.clamp(c.k11 or 85, 30, 200)
+	local blast = math.clamp(c.k12 or 250, 100, 500)
+	local rise = math.clamp(c.k14 or 300, 80, 600)
+	local cone = math.clamp(c.k15 or 75, 20, 200)
+	local reach = math.clamp(c.k16 or 160, 0, 450)
+	local r, a, y
+	if pick < 0.22 then
+		-- A flared cone and open rim keep the eruption readable between volleys.
+		a = ((id - 1) % 8) * TAU / 8 + (v - 0.5) * 0.18 + phase * 0.08
+		r = crater * (2.15 - u * 1.15)
+		y = cone * u
+	elseif pick < 0.40 then
+		a = u * TAU + phase * 0.12
+		r = crater * (1 + 0.055 * math.cos(v * TAU))
+		y = cone + crater * 0.05 * math.sin(v * TAU)
+	elseif pick < 0.86 then
+		local jet = (id - 1) % 8
+		local q = phase * 0.85 + u * TAU
+		local outward = (1 - math.cos(q)) * 0.5
+		local loft = math.max(0, math.sin(q))
+		r = crater + blast * outward
+		a = jet * TAU / 8 + phase * 0.13 + (v - 0.5) * 0.1 + outward * 0.2
+		-- The outward arc rises and falls. Its return slides along the ground;
+		-- both joins have zero vertical speed, without a wrapped-time teleport.
+		y = cone * (1 - outward) + rise * loft * loft * (0.8 + w * 0.2)
+	else
+		a = u * TAU + phase * 0.2
+		local sweep = (1 + math.sin(phase * 0.65 - u * TAU)) * 0.5
+		r = crater * 1.25 + blast * sweep
+		y = 4 + cone * 0.1 * math.sin(v * math.pi) ^ 2
+	end
+	local travel = phase * 0.14
+	local center = Vector3.new(reach * math.sin(travel), c.k17 or 0, reach * math.sin(travel * 0.71 + 0.5))
+	local target = cen + center + Vector3.new(r * math.cos(a), y, r * math.sin(a))
+	if x6.motion_offset then target = target + x6.motion_offset end
+	return (target - p.Position) * (x1.k10 * x9.c1), target
+end
+
+function M.cleanup(x6)
+	if x6.pre then x6.pre[NAME] = nil end
+end
+
+M.Controls = {
+	{ Type = "Slider", Name = "Crater Radius", Min = 30, Max = 200, Key = "k11", Default = 85 },
+	{ Type = "Slider", Name = "Blast Reach", Min = 100, Max = 500, Key = "k12", Default = 250 },
+	{ Type = "Slider", Name = "Eruption Speed", Min = 0, Max = 45, Key = "k13", Default = 10, ExactMax = true },
+	{ Type = "Slider", Name = "Fountain Height", Min = 80, Max = 600, Key = "k14", Default = 300 },
+	{ Type = "Slider", Name = "Crater Height", Min = 20, Max = 200, Key = "k15", Default = 75 },
+	{ Type = "Slider", Name = "Advance Area", Min = 0, Max = 450, Key = "k16", Default = 160 },
+	{ Type = "Slider", Name = "Base Elevation", Min = -100, Max = 250, Key = "k17", Default = 0 },
+}
+
+return M

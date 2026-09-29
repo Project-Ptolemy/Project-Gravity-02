@@ -7,6 +7,70 @@ NEW_SHAPES = (
     "Infernal Skull", "Chrono Hourglass", "Storm Gyre",
 )
 
+DISASTER_GROUPS = (
+    ("Breakers and hunters", (
+        ("Tsunami", "Twin curling breakers with a sweeping shoreline"),
+        ("Killer", "Fast core strikes with bowed reload paths"),
+        ("Cataclysm Dragon", "A charging dragon with broad beating wings"),
+        ("Thunderbird", "Banking dives with jagged lightning streamers"),
+        ("Abyssal Maw", "A huge toothed mouth lunges and bites"),
+        ("Dreadnought", "A heavy ram ship plows through a rolling wake"),
+    )),
+    ("Map-scale disasters", (
+        ("Titan Stampede", "Three horned beasts charge with running strides"),
+        ("Rift Reaper", "Moving portal mouths launch sweeping scythe arcs"),
+        ("Extinction Comet", "A diving comet drags five long braided flames"),
+        ("Faultline", "Traveling slabs erupt along a jagged ground ridge"),
+        ("Eruption", "A moving crater throws fountains into low lava sweeps"),
+        ("Oblivion Drill", "A colossal corkscrew bores along a winding path"),
+    )),
+)
+DISASTER_SHAPES = tuple(name for _, entries in DISASTER_GROUPS for name, _ in entries)
+
+VAST_GROUPS = (
+    ("Networks and megastructures", (
+        ("Constellation Lattice", "A vast diamond network flexes around moving joints"),
+        ("Cosmic Strings", "Long bowed strings sweep and carry traveling ripples"),
+        ("Fractal Dominion", "An immense branching structure grows and contracts"),
+        ("Nebula Highway", "Three raised crossings carry recirculating debris"),
+        ("Event Horizon Array", "Four moving cores pull arcing streams between them"),
+        ("Parallax Grid", "A huge checkerboard folds into a traveling wall"),
+    )),
+    ("Cosmic machinery", (
+        ("Astral Clockwork", "Giant hands sweep a turning segmented dial"),
+        ("Infinity Weave", "Braided streams cross through a vast figure eight"),
+        ("Prism Cascade", "Triangular cages rise and fall along stepped channels"),
+        ("Starforge Crucible", "A huge bowl draws in feeds and swings forging arms"),
+        ("Continental Conveyor", "A giant belt rolls around two wheel ends"),
+        ("Worldbreaker Wheel", "An enormous upright spoked wheel rolls across the map"),
+    )),
+    ("Moving fortifications", (
+        ("Siege Meridian", "An advancing arch carries sweeping battering strikers"),
+        ("Iron Procession", "Tall linked walls march along a folding line"),
+        ("Crown of Ruin", "A jagged crown widens, sweeps and slams"),
+        ("Guillotine Array", "Five giant frames drop their blades in sequence"),
+        ("Pendulum Court", "Three monumental pendulums swing in opposed phases"),
+        ("Obsidian Causeway", "A long arched bridge advances with a shifting deck"),
+    )),
+    ("Siege and terrain", (
+        ("Bastion Carousel", "Four fortified towers travel on turning cross arms"),
+        ("Railstorm Battery", "Three long rails launch recirculating volleys"),
+        ("Continental Shelf", "Two huge tectonic plates collide, heave and slide"),
+        ("Avalanche Front", "A broad moving slope rolls into a tumbling debris front"),
+        ("Floodgate", "A monumental dam drives broad surges through three gates"),
+        ("Razorgrass Expanse", "Giant blade rows sweep in traveling waves"),
+    )),
+    ("Sky and force fields", (
+        ("Sandstorm Wall", "A vast upright wind front rolls across the map"),
+        ("Thunderhead Armada", "Migrating anvil clouds drag long lightning curtains"),
+        ("Meteor Dominion", "Three massive meteors dive along staggered routes"),
+        ("Solar Flare", "Enormous flare tongues arc from a broad hemisphere"),
+        ("Shockwave Barrage", "Polygonal ground fronts expand in alternating shocks"),
+        ("Polar Rift", "Two serrated walls unzip a colossal jagged fissure"),
+    )),
+)
+VAST_SHAPES = tuple(name for _, entries in VAST_GROUPS for name, _ in entries)
+
 GROUPS = (
     ("Creatures", (
         ("Phoenix Ascendant", "Banking flight, wingbeats and flowing tails"),
@@ -114,8 +178,16 @@ GROUPS = (
     )),
 )
 
+GROUPS += DISASTER_GROUPS + VAST_GROUPS + (
+    ("Gather and release", (("Black Hole v2", "Spiral capture into a dense moving sphere"),)),
+)
 CAPTIONS = {name: caption for _, entries in GROUPS for name, caption in entries}
 VIEWS = {
+    "Constellation Lattice": (24, 28), "Cosmic Strings": (18, 35),
+    "Fractal Dominion": (15, 52), "Nebula Highway": (20, 42),
+    "Parallax Grid": (20, 38), "Astral Clockwork": (10, 58),
+    "Infinity Weave": (0, 58), "Starforge Crucible": (22, 35),
+    "Tsunami": (8, 10), "Titan Stampede": (45, 18),
     "Rift Gate": (48, 18),
     "Celestial Manta": (15, 42), "Megalodon": (65, 15), "Ghost Galleon": (52, 16),
     "Infernal Skull": (8, 8), "Aegis Bastion": (12, 8), "Void Cathedral": (30, 18),

@@ -1,5 +1,14 @@
 # Changelog
 
+## September 29, 2026 - 42 new moving formations
+
+- Add Tsunami's twin curling breakers and Killer's rapid converging rubble volleys from the recommendations sketches.
+- Add Cataclysm Dragon, Thunderbird, Abyssal Maw, Dreadnought, Titan Stampede, Rift Reaper, Extinction Comet, Faultline, Eruption and Oblivion Drill.
+- Give each formation seven controls, large defaults, active travel, deterministic debris slots, reversible animation and isolated cleanup. Register all twelve for desktop and mobile.
+- Use frame tracking and a speed-budgeted animation clock for Killer's fast passes.
+- Add thirty more distinct vast formations: branching networks, crossing highways, folding grids, rolling machinery, moving fortifications, tectonic plates and broad disaster fields. Each has five to seven controls; the full set is documented in docs/VAST.md.
+- Add mixed-debris previews, sparse galleries and geometry/runtime regression checks. Update the preview catalog for all 117 active shapes and four review modules.
+
 ## September 28, 2026 - Effects and physics controls
 
 - Raise Goro Goro no Mi's Flicker Rate slider and runtime limit from 60 to 300.

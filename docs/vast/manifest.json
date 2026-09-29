@@ -1,0 +1,491 @@
+{
+  "runtime": "lune 0.10.5",
+  "parts": 512,
+  "frames": 96,
+  "duration": 8,
+  "simulation_hz": 60,
+  "groups": [
+    {
+      "title": "Networks and megastructures",
+      "gif": "motion-01.gif",
+      "shapes": [
+        {
+          "name": "Constellation Lattice",
+          "config": {
+            "k11": 860,
+            "k12": 310,
+            "k13": 18,
+            "k14": 55,
+            "k15": 27,
+            "k16": 90
+          },
+          "source_fingerprint": "2863c4bcb7f2b2843442c453d8186b361695bb024b3b3a1445917edbc806e3d0",
+          "moving_parts": 512,
+          "max_displacement": 838.246,
+          "distinct_frames": 96
+        },
+        {
+          "name": "Cosmic Strings",
+          "config": {
+            "k11": 960,
+            "k12": 145,
+            "k13": 22,
+            "k14": 560,
+            "k15": 45,
+            "k16": 55
+          },
+          "source_fingerprint": "fa96189ac29372288689b9c34792b9d1c081bf296a06f7df1e9ad6727b1481c1",
+          "moving_parts": 512,
+          "max_displacement": 1000.556,
+          "distinct_frames": 96
+        },
+        {
+          "name": "Fractal Dominion",
+          "config": {
+            "k11": 860,
+            "k12": 150,
+            "k13": 17,
+            "k14": 14,
+            "k15": 18,
+            "k16": 30
+          },
+          "source_fingerprint": "458c91a232915a6df64c6401b346abae5fcc3f02c3fe039ee53ca98f3c3e8fcf",
+          "moving_parts": 512,
+          "max_displacement": 366.096,
+          "distinct_frames": 96
+        },
+        {
+          "name": "Nebula Highway",
+          "config": {
+            "k11": 960,
+            "k12": 80,
+            "k13": 24,
+            "k14": 95,
+            "k15": 16,
+            "k16": 40
+          },
+          "source_fingerprint": "c8e95aae57e4a0ac70089ebc37051d064a188be985702a965f427c1dd60757f2",
+          "moving_parts": 512,
+          "max_displacement": 995.353,
+          "distinct_frames": 96
+        },
+        {
+          "name": "Event Horizon Array",
+          "config": {
+            "k11": 740,
+            "k12": 64,
+            "k13": 20,
+            "k14": 220,
+            "k15": 80,
+            "k16": 90
+          },
+          "source_fingerprint": "37589bd435c63e8c3897a1ab517fd5fb5084a3d6bc4f7ebafe936ad7cdbbd13d",
+          "moving_parts": 512,
+          "max_displacement": 966.751,
+          "distinct_frames": 96
+        },
+        {
+          "name": "Parallax Grid",
+          "config": {
+            "k11": 880,
+            "k12": 310,
+            "k13": 18,
+            "k14": 6,
+            "k15": 12,
+            "k16": 20
+          },
+          "source_fingerprint": "9e532925b4f7e1422055a694454492dfba4aedb7b61fd840af6a992122eae32d",
+          "moving_parts": 512,
+          "max_displacement": 710.905,
+          "distinct_frames": 96
+        }
+      ]
+    },
+    {
+      "title": "Cosmic machinery",
+      "gif": "motion-02.gif",
+      "shapes": [
+        {
+          "name": "Astral Clockwork",
+          "config": {
+            "k11": 455,
+            "k12": 35,
+            "k13": 20,
+            "k14": 24,
+            "k15": 28,
+            "k16": 18,
+            "k17": 95
+          },
+          "source_fingerprint": "8ace5f89febca1f89ab94f785cf43080b252f3235130a7d2ec45ffde142a026f",
+          "moving_parts": 512,
+          "max_displacement": 608.824,
+          "distinct_frames": 96
+        },
+        {
+          "name": "Infinity Weave",
+          "config": {
+            "k11": 1000,
+            "k12": 120,
+            "k13": 24,
+            "k14": 28,
+            "k15": 4,
+            "k16": 100
+          },
+          "source_fingerprint": "dc156536ec8a7d0570dc250808cf76b301ea56a37b6e15434e8ae548c194f386",
+          "moving_parts": 512,
+          "max_displacement": 1108.999,
+          "distinct_frames": 96
+        },
+        {
+          "name": "Prism Cascade",
+          "config": {
+            "k11": 190,
+            "k12": 95,
+            "k13": 20,
+            "k14": 220,
+            "k15": 110,
+            "k16": 55,
+            "k17": 80
+          },
+          "source_fingerprint": "9b62258d0fdf03eeb4574a8797d537a221078d97a6bdb138b2dc602a63192888",
+          "moving_parts": 512,
+          "max_displacement": 369.703,
+          "distinct_frames": 96
+        },
+        {
+          "name": "Starforge Crucible",
+          "config": {
+            "k11": 325,
+            "k12": 180,
+            "k13": 20,
+            "k14": 520,
+            "k15": 110,
+            "k16": 24,
+            "k17": 20
+          },
+          "source_fingerprint": "e10ac18f3109999edf584961e1b457011a273db17b274460d3b6aabac941babc",
+          "moving_parts": 512,
+          "max_displacement": 845.375,
+          "distinct_frames": 96
+        },
+        {
+          "name": "Continental Conveyor",
+          "config": {
+            "k11": 720,
+            "k12": 100,
+            "k13": 18,
+            "k14": 240,
+            "k15": 230,
+            "k16": 110
+          },
+          "source_fingerprint": "cfb28ada240ef53dff4baae409503f6ad17303d3b185a38cec0cb6f39b946e56",
+          "moving_parts": 512,
+          "max_displacement": 970.203,
+          "distinct_frames": 96
+        },
+        {
+          "name": "Worldbreaker Wheel",
+          "config": {
+            "k11": 330,
+            "k12": 180,
+            "k13": 18,
+            "k14": 520,
+            "k15": 8
+          },
+          "source_fingerprint": "469870a6d92d4db582129ce216708280774eb602dc789d646f60f1fd81d1532b",
+          "moving_parts": 512,
+          "max_displacement": 978.982,
+          "distinct_frames": 96
+        }
+      ]
+    },
+    {
+      "title": "Moving fortifications",
+      "gif": "motion-03.gif",
+      "shapes": [
+        {
+          "name": "Siege Meridian",
+          "config": {
+            "k11": 900,
+            "k12": 410,
+            "k13": 20,
+            "k14": 110,
+            "k15": 280,
+            "k16": 280
+          },
+          "source_fingerprint": "7324a06c9880050283be9e0629209e69e4c8fe8ec4696ff56d5f2de21ab43d12",
+          "moving_parts": 512,
+          "max_displacement": 421.142,
+          "distinct_frames": 96
+        },
+        {
+          "name": "Iron Procession",
+          "config": {
+            "k11": 1080,
+            "k12": 290,
+            "k13": 18,
+            "k14": 38,
+            "k15": 48,
+            "k16": 300
+          },
+          "source_fingerprint": "82e8e13eeb117fc126653480c0bc37374d0371f2dbaf5f6acc9d273edab9354e",
+          "moving_parts": 512,
+          "max_displacement": 612.775,
+          "distinct_frames": 96
+        },
+        {
+          "name": "Crown of Ruin",
+          "config": {
+            "k11": 370,
+            "k12": 220,
+            "k13": 22,
+            "k14": 25,
+            "k15": 170,
+            "k16": 260
+          },
+          "source_fingerprint": "3a39065c97dec2110933bca29da0ad4ebdd79130206e6c449dbbc6d6853f2ede",
+          "moving_parts": 512,
+          "max_displacement": 1074.237,
+          "distinct_frames": 96
+        },
+        {
+          "name": "Guillotine Array",
+          "config": {
+            "k11": 1000,
+            "k12": 360,
+            "k13": 19,
+            "k14": 260,
+            "k15": 260,
+            "k16": 90
+          },
+          "source_fingerprint": "cfec13362b8cf42b68ae58f2ec68589e7680241e32cb8458521e862d20f668a7",
+          "moving_parts": 512,
+          "max_displacement": 340.318,
+          "distinct_frames": 96
+        },
+        {
+          "name": "Pendulum Court",
+          "config": {
+            "k11": 960,
+            "k12": 340,
+            "k13": 22,
+            "k14": 95,
+            "k15": 60,
+            "k16": 250
+          },
+          "source_fingerprint": "215e4bcefdcf8db0fd5258d071329a08950c11dabba7b3a9722149c570041d31",
+          "moving_parts": 512,
+          "max_displacement": 395.555,
+          "distinct_frames": 96
+        },
+        {
+          "name": "Obsidian Causeway",
+          "config": {
+            "k11": 1000,
+            "k12": 180,
+            "k13": 16,
+            "k14": 200,
+            "k15": 40,
+            "k16": 270
+          },
+          "source_fingerprint": "ec646ec937a80f57385133eb4c4fd1455f73748581cb40bd483857a0b788576c",
+          "moving_parts": 512,
+          "max_displacement": 275.551,
+          "distinct_frames": 96
+        }
+      ]
+    },
+    {
+      "title": "Siege and terrain",
+      "gif": "motion-04.gif",
+      "shapes": [
+        {
+          "name": "Bastion Carousel",
+          "config": {
+            "k11": 350,
+            "k12": 260,
+            "k13": 18,
+            "k14": 145,
+            "k15": 220,
+            "k16": 45
+          },
+          "source_fingerprint": "6c11aed5dd8798992c14e952e4ced5b9d646b0d005c750551f660e4ee3bdd46d",
+          "moving_parts": 512,
+          "max_displacement": 1010.561,
+          "distinct_frames": 96
+        },
+        {
+          "name": "Railstorm Battery",
+          "config": {
+            "k11": 440,
+            "k12": 440,
+            "k13": 30,
+            "k14": 440,
+            "k15": 230,
+            "k16": 120
+          },
+          "source_fingerprint": "06832b172fc9ab55e778bbf1642639e6fe5df13c5ddcbd952ae80bd2beb8bd61",
+          "moving_parts": 512,
+          "max_displacement": 908.954,
+          "distinct_frames": 96
+        },
+        {
+          "name": "Continental Shelf",
+          "config": {
+            "k11": 350,
+            "k12": 560,
+            "k13": 10,
+            "k14": 115,
+            "k15": 105,
+            "k16": 35
+          },
+          "source_fingerprint": "e17b2a833903909e6b2d28fb7502bbf88c05a456f69546f5e305905c8ee745c9",
+          "moving_parts": 512,
+          "max_displacement": 160.181,
+          "distinct_frames": 96
+        },
+        {
+          "name": "Avalanche Front",
+          "config": {
+            "k11": 820,
+            "k12": 530,
+            "k13": 12,
+            "k14": 340,
+            "k15": 85,
+            "k16": 30
+          },
+          "source_fingerprint": "e226a72b562d9fcde7faf05d7bb6712b2b52ab48559e6c6260338817d87453d9",
+          "moving_parts": 512,
+          "max_displacement": 329.019,
+          "distinct_frames": 96
+        },
+        {
+          "name": "Floodgate",
+          "config": {
+            "k11": 800,
+            "k12": 330,
+            "k13": 10,
+            "k14": 540,
+            "k15": 80,
+            "k16": 30
+          },
+          "source_fingerprint": "a0006cd62d0000fb767c0fe1a9e681a365be3e9059cf58fbc38501e35d91338f",
+          "moving_parts": 512,
+          "max_displacement": 211.055,
+          "distinct_frames": 96
+        },
+        {
+          "name": "Razorgrass Expanse",
+          "config": {
+            "k11": 860,
+            "k12": 650,
+            "k13": 12,
+            "k14": 250,
+            "k15": 125,
+            "k16": 15
+          },
+          "source_fingerprint": "b23eb25701050541e25ce62ea94a482bbd73c0cfe7fa318674ff1962f9bde113",
+          "moving_parts": 512,
+          "max_displacement": 128.411,
+          "distinct_frames": 96
+        }
+      ]
+    },
+    {
+      "title": "Sky and force fields",
+      "gif": "motion-05.gif",
+      "shapes": [
+        {
+          "name": "Sandstorm Wall",
+          "config": {
+            "k11": 940,
+            "k12": 440,
+            "k13": 11,
+            "k14": 115,
+            "k15": 210,
+            "k16": 15
+          },
+          "source_fingerprint": "40a6a0b8952117fa33d8f11b5e853f4eef7646ef22ad0c2d6118fb1794a2fdb0",
+          "moving_parts": 512,
+          "max_displacement": 209.005,
+          "distinct_frames": 96
+        },
+        {
+          "name": "Thunderhead Armada",
+          "config": {
+            "k11": 940,
+            "k12": 470,
+            "k13": 10,
+            "k14": 390,
+            "k15": 155,
+            "k16": 0
+          },
+          "source_fingerprint": "9854905fe1de37622cbcc0aab6cd32f092e4ccf230eb5c79e968f555bfcf25e0",
+          "moving_parts": 512,
+          "max_displacement": 83.369,
+          "distinct_frames": 96
+        },
+        {
+          "name": "Meteor Dominion",
+          "config": {
+            "k11": 110,
+            "k12": 540,
+            "k13": 10,
+            "k14": 250,
+            "k15": 160,
+            "k16": 290
+          },
+          "source_fingerprint": "a86f672af3c0dedb4bf4ea6655a119264c93383614fbbd3e4a56758f47fcbf48",
+          "moving_parts": 512,
+          "max_displacement": 232.453,
+          "distinct_frames": 96
+        },
+        {
+          "name": "Solar Flare",
+          "config": {
+            "k11": 320,
+            "k12": 360,
+            "k13": 11,
+            "k14": 185,
+            "k15": 6,
+            "k16": 45
+          },
+          "source_fingerprint": "affcf782888721745c59dce686f7e08f02007fc08e2db69f68c222212bd23fcc",
+          "moving_parts": 512,
+          "max_displacement": 241.688,
+          "distinct_frames": 96
+        },
+        {
+          "name": "Shockwave Barrage",
+          "config": {
+            "k11": 460,
+            "k12": 90,
+            "k13": 10,
+            "k14": 3,
+            "k15": 8,
+            "k16": 15
+          },
+          "source_fingerprint": "27b11c539301ac2b3729b59859d4063d6573930ad56f7d3e4951f279b371f9c3",
+          "moving_parts": 512,
+          "max_displacement": 121.457,
+          "distinct_frames": 96
+        },
+        {
+          "name": "Polar Rift",
+          "config": {
+            "k11": 650,
+            "k12": 760,
+            "k13": 10,
+            "k14": 160,
+            "k15": 70,
+            "k16": 20
+          },
+          "source_fingerprint": "478e42f19ebc787c6502181bdbf6ac73e8e9601b89af85e676d76cccf2be65ef",
+          "moving_parts": 512,
+          "max_displacement": 71.059,
+          "distinct_frames": 96
+        }
+      ]
+    }
+  ]
+}

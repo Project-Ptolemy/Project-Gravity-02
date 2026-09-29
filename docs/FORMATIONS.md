@@ -7,7 +7,9 @@ part assignments help the figures hold together when the available debris change
 
 **[Earlier 78-shape motion gallery](motion/index.md)** — 13 GIFs with six shapes
 each, including four review modules. This snapshot predates Black Hole v2 and the latest
-Phoenix, Megalodon and Drop updates; there are now 75 active shapes.
+Phoenix, Megalodon and Drop updates; there are now 117 active shapes.
+The latest twelve additions have their own [moving disaster guide and previews](DISASTERS.md).
+Another [thirty vast formations](VAST.md) focus on networks, machines and sweeping fields.
 
 ## The fifteen additions
 
