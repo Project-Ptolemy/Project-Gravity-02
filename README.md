@@ -108,8 +108,13 @@ Start at the [main homepage](index.html), then open the
 [plugin guide](docs/plugins/). Draw custom paths
 and freehand strokes, edit vertices in 3D, build regular polygons, and combine
 independent layers. Import SVG outlines or 3D coordinates, or generate curves and
-surfaces with formulas. Add transforms, motion and in-game controls, then save an
+surfaces with formulas. Move, rotate or scale selected groups of vertices, extrude
+or revolve your drawn profiles, and repeat layers in lines or radial arrangements.
+Add transforms, motion and in-game controls, then save an
 editable JSON project or export a Lua module for Project Gravity.
+
+New scenes default to **128 debris parts**. Existing projects keep their saved
+count; change it under **Preview settings → Debris count**.
 
 The editor uses vanilla JavaScript, HTML and CSS, with no framework, external
 runtime packages or build step. Projects autosave when browser storage has room;
@@ -131,8 +136,7 @@ For Cloudflare Pages connected to this Git repository, choose **None** as the
 framework, **`exit 0`** as the build command, and **`.`** as the build output
 directory. Leave the root directory unset (the repository root). The entry page
 is `/index.html`; the builder and guide retain their `/docs/plugins/` paths.
-See [hosting details](docs/PLUGINS.md#publish-the-website). These settings describe
-how to deploy this layout; they do not indicate that it has been deployed.
+See [hosting details](docs/PLUGINS.md#publish-the-website).
 
 Export your formation as `.lua`, save it in
 your executor's `GravityShapes` folder, then restart Project Gravity and select the

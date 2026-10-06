@@ -3,6 +3,7 @@ import { compilePath, samplePath, MAX_PATH_POINTS, PATH_COORDINATE_LIMIT } from 
 // The editor and exported plugin share this point-sampling contract. All units
 // are Roblox studs, degrees, and seconds of the engine's formation clock.
 export const LAYER_TYPES = Object.freeze(['sphere', 'ring', 'torus', 'helix', 'box', 'grid', 'cone', 'cylinder', 'line', 'spiral', 'polygon', 'path', 'pointcloud']);
+export const DEFAULT_PART_COUNT = 128;
 const def = (label, min, max, step, value) => Object.freeze({ label, min, max, step, default: value });
 export const PROPERTY_DEFS = Object.freeze({
   radius: def('Radius', 0, 500, 0.1, 24),
@@ -188,7 +189,7 @@ export function normalizeProject(input) {
   const project = {
     version: 1,
     name: text(input.name, 'Untitled shape', 80, 'Project name'),
-    parts: numeric(input.parts, 640, 1, 8192, 'Preview part count'),
+    parts: numeric(input.parts, DEFAULT_PART_COUNT, 1, 8192, 'Preview part count'),
     pointSize: numeric(input.pointSize, 3.4, 0.25, 10, 'Preview point size'),
     layers: input.layers.map(normalizeLayer), controls: [],
   };
@@ -246,7 +247,7 @@ export function normalizeProject(input) {
 }
 
 export function createProject(preset = 'orbit') {
-  const project = { version: 1, name: 'Untitled shape', parts: 640, pointSize: 3.4, layers: [], controls: [] };
+  const project = { version: 1, name: 'Untitled shape', parts: DEFAULT_PART_COUNT, pointSize: 3.4, layers: [], controls: [] };
   const add = (type, overrides) => { const layer = createLayer(type, overrides); project.layers.push(layer); return layer; };
   if (preset === 'blank') return project;
   if (preset === 'helix') {

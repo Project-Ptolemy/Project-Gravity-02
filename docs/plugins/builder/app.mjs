@@ -3,6 +3,8 @@ import { exportLua } from './exporter.mjs';
 import { Viewport } from './viewport.mjs';
 import { openPathEditor } from './editors/path-editor.mjs';
 import { openSourceEditor } from './editors/source-editor.mjs';
+import { openSurfaceEditor } from './editors/surface-editor.mjs';
+import { openRepeatEditor } from './editors/repeat-editor.mjs';
 import { readProjectFile, serializeProject } from './project-file.mjs';
 
 const $ = id => document.getElementById(id);
@@ -186,6 +188,7 @@ function renderLayers() {
   $('layers').innerHTML = filtered.map(layer => `<div class="layer-row ${layer.id === selectedId ? 'selected' : ''} ${layer.visible ? '' : 'invisible'}" data-layer="${escapeHTML(layer.id)}" role="listitem" draggable="true" style="--layer-color:${layer.color}"><button class="layer-select" aria-pressed="${layer.id === selectedId}" title="Select ${escapeHTML(layer.name)}; drag to reorder"><span class="layer-symbol">${icon(layer.type)}</span><span class="layer-name">${escapeHTML(layer.name)}</span></button><button class="icon-button layer-visibility" aria-label="${layer.visible ? 'Hide' : 'Show'} ${escapeHTML(layer.name)}" aria-pressed="${layer.visible}" title="${layer.visible ? 'Hide' : 'Show'} layer">${icon(layer.visible ? 'eye' : 'eye-off')}</button></div>`).join('') || `<p class="layers-empty">${project.layers.length ? 'No layers match your search.' : 'Your next idea belongs here.'}</p>`;
   $('layers').scrollTop = scrollTop;
   $('duplicate').disabled = !selectedLayer() || project.layers.length >= 64;
+  $('repeat-layer').disabled = !selectedLayer() || project.layers.length >= 64;
   $('delete-layer').disabled = !selectedLayer();
   const index = project.layers.findIndex(layer => layer.id === selectedId);
   $('move-up').disabled = index < 1;
@@ -256,7 +259,7 @@ function renderProperties() {
 function customGeometryFields(layer) {
   if (layer.type === 'polygon') return `<section class="custom-geometry-panel"><p>Choose the number of sides below. Convert to a path to move each vertex freely.</p><button id="convert-path" class="secondary-button">${icon('edit')}Edit individual vertices</button></section>`;
   if (!layer.path) return '';
-  return `<section class="custom-geometry-panel"><div class="custom-geometry-summary"><span>${layer.path.points.length.toLocaleString()} vertices</span><span>${layer.type === 'pointcloud' ? 'Separate points' : (layer.path.closed ? 'Closed' : 'Open') + (layer.path.smooth ? ' · Smooth' : ' · Straight')}</span></div><button id="edit-path" class="secondary-button">${icon('edit')}Edit vertices</button>${layer.type === 'pointcloud' ? '<p>Points stay separate. Their order determines how debris is distributed.</p>' : '<p>Draw, move or insert vertices. Switch drawing planes to shape it in 3D. Tube radius gives your outline thickness.</p>'}<div class="geometry-mirrors"><span>Mirror</span>${['x', 'y', 'z'].map(axis => `<button class="quiet-button" data-mirror="${axis}" aria-label="Mirror vertices on ${axis.toUpperCase()} axis">${axis.toUpperCase()}</button>`).join('')}</div></section>`;
+  return `<section class="custom-geometry-panel"><div class="custom-geometry-summary"><span>${layer.path.points.length.toLocaleString()} vertices</span><span>${layer.type === 'pointcloud' ? 'Separate points' : (layer.path.closed ? 'Closed' : 'Open') + (layer.path.smooth ? ' · Smooth' : ' · Straight')}</span></div><button id="edit-path" class="secondary-button">${icon('edit')}Edit vertices</button>${layer.type === 'pointcloud' ? '<p>Select and transform groups of points to reshape this surface. Points remain separate.</p>' : '<p>Draw or select vertices, then move, rotate, scale or flatten your selection. Tube radius gives the outline thickness.</p><button id="make-surface" class="secondary-button">' + icon('cube') + 'Make a surface</button><p>Extrude outline walls or revolve a profile. The result is a new editable layer.</p>'}<div class="geometry-mirrors"><span>Mirror</span>${['x', 'y', 'z'].map(axis => `<button class="quiet-button" data-mirror="${axis}" aria-label="Mirror vertices on ${axis.toUpperCase()} axis">${axis.toUpperCase()}</button>`).join('')}</div></section>`;
 }
 function renderControls() {
   $('control-count').textContent = project.controls.length;
@@ -297,20 +300,40 @@ function addLayer(type) {
   if (project.layers.length === 1) { viewport.setPoints(sampleProject(project, time, previewValues)); viewport.fit(); }
   if (type === 'polygon') { viewport.setView('front'); viewport.setPoints(sampleProject(project, time, previewValues)); viewport.fit(); }
 }
-function addGeometry(specs) {
+function addGeometry(specs, cameraView = 'front') {
   if (project.layers.length + specs.length > 64) throw new Error('A project can contain up to 64 layers.');
-  const layers = specs.map((spec, index) => createLayer(spec.type, { ...spec, color: colors[(project.layers.length + index) % colors.length] }));
+  const layers = specs.map((spec, index) => createLayer(spec.type, { ...spec, color: spec.color ?? colors[(project.layers.length + index) % colors.length] }));
   // Validate the complete result before committing one undoable action.
   normalizeProject({ ...project, layers: [...project.layers, ...layers] });
   mutate(() => { project.layers.push(...layers); selectedId = layers[0].id; });
   layerFilter = ''; $('layer-search').value = ''; soloState = null;
-  renderAll(); setTab('properties'); viewport.setView('front'); viewport.setPoints(sampleProject(project, time, previewValues)); viewport.fit();
+  renderAll(); setTab('properties'); viewport.setView(cameraView); viewport.setPoints(sampleProject(project, time, previewValues)); viewport.fit();
   toast(`${layers.length === 1 ? layers[0].name : layers.length + ' geometry layers'} added. Select a layer to edit its vertices.`);
 }
 function drawPath() {
   if (project.layers.length >= 64) { toast('A project can contain up to 64 layers.'); return; }
   $('shape-dialog').close();
   openPathEditor({ path: { points: [], closed: false, smooth: false }, onApply: path => addGeometry([{ type: 'path', name: 'Custom path', path }]) });
+}
+function makeSurface() {
+  const layer = selectedLayer(); if (layer?.type !== 'path') return;
+  if (project.layers.length >= 64) { toast('A project can contain up to 64 layers.'); return; }
+  // Use saved control defaults; temporary preview values do not become geometry.
+  const source = clone(layer);
+  for (const control of project.controls.filter(control => control.layerId === layer.id && controlType(control) !== 'button')) {
+    setProperty(source, control.property, control.default);
+  }
+  openSurfaceEditor({ layer: source, onApply: spec => addGeometry([spec], 'perspective') });
+}
+function repeatLayer() {
+  if (!selectedLayer() || project.layers.length >= 64) return;
+  openRepeatEditor({ project, layerId: selectedId, onApply: ({ layers, controls }) => {
+    const next = normalizeProject({ ...project, layers: [...project.layers, ...layers], controls: [...project.controls, ...controls] });
+    mutate(() => { project = next; selectedId = layers[0].id; });
+    layerFilter = ''; $('layer-search').value = ''; soloState = null;
+    renderAll(); setTab('properties'); viewport.setPoints(sampleProject(project, time, previewValues)); viewport.fit();
+    toast(`${layers.length} editable copies added with their controls. Undo removes the whole arrangement.`);
+  } });
 }
 function editPath() {
   const layer = selectedLayer(); if (!layer?.path) return;
@@ -527,6 +550,7 @@ $('properties-panel').addEventListener('change', event => {
 });
 $('properties-panel').addEventListener('click', event => {
   if (event.target.closest('#edit-path')) { editPath(); return; }
+  if (event.target.closest('#make-surface')) { makeSurface(); return; }
   if (event.target.closest('#convert-path')) { convertPolygon(); return; }
   const mirror = event.target.closest('[data-mirror]');
   if (mirror && selectedLayer()?.path) {
@@ -592,6 +616,7 @@ $('presets').innerHTML = [['orbit', 'Orbit Bloom'], ['helix', 'Double Helix'], [
 $('presets').onclick = event => { const button = event.target.closest('[data-preset]'); if (button) loadPreset(button.dataset.preset); };
 $('new-project').onclick = () => loadPreset('blank');
 $('duplicate').onclick = duplicateLayer; $('delete-layer').onclick = deleteLayer;
+$('repeat-layer').onclick = repeatLayer;
 for (const [id, offset] of [['move-up', -1], ['move-down', 1]]) $(id).onclick = () => { const index = project.layers.findIndex(layer => layer.id === selectedId); if (index < 0 || index + offset < 0 || index + offset >= project.layers.length) return; mutate(() => { const [layer] = project.layers.splice(index, 1); project.layers.splice(index + offset, 0, layer); }); renderLayers(); };
 $('undo').onclick = () => history('undo'); $('redo').onclick = () => history('redo');
 $('project-name').onchange = () => { const name = $('project-name').value.trim(); if (name) mutate(() => { project.name = name; }); renderTitle(); };

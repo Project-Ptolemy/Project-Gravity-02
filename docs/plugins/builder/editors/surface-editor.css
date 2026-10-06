@@ -1,0 +1,11 @@
+.surface-editor{width:min(980px,calc(100vw - 28px));max-width:980px}
+.surface-layout{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:28px;align-items:start;margin-top:24px}
+.surface-inputs .form-label{margin:0 0 15px;font-size:11px}
+.surface-inputs .micro-copy{line-height:1.7;margin:12px 0}
+.surface-triple{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+.surface-density{margin-top:20px}
+.surface-preview{position:sticky;top:0;display:flex;flex-direction:column;gap:12px;min-width:0;padding:12px;border:1px solid var(--line);border-radius:8px;background:#171d14}
+.surface-preview canvas{display:block;width:100%;height:320px;border-radius:4px;touch-action:none}
+.surface-preview p{font:10px/1.7 var(--mono);color:var(--muted);min-height:34px}
+.surface-editor .form-error{margin-top:16px}
+@media(max-width:650px){.surface-layout{grid-template-columns:1fr;gap:20px}.surface-preview{position:static}.surface-preview canvas{height:210px}.surface-editor{padding:22px}.surface-triple{gap:8px}.surface-inputs .form-columns{gap:12px}}

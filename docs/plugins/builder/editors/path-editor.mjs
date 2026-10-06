@@ -1,4 +1,5 @@
 import { flattenPath, MAX_PATH_POINTS, PATH_COORDINATE_LIMIT } from '../geometry/path.mjs';
+import { boundedTranslation, flattenVertices, selectionCenter, transformVertices } from '../geometry/vertices.mjs';
 
 const PLANES = { xy: ['x', 'y', 'z'], xz: ['x', 'z', 'y'], yz: ['y', 'z', 'x'] };
 const copy = value => JSON.parse(JSON.stringify(value));
@@ -13,6 +14,7 @@ export function openPathEditor({ path, onApply, minPoints = 2 }) {
     .map(point => ({ x: bound(point.x), y: bound(point.y), z: bound(point.z) }));
   let draft = { points, closed: !pointCloud && Boolean(path?.closed), smooth: !pointCloud && Boolean(path?.smooth) };
   let selected = points.length - 1;
+  let selection = new Set(selected >= 0 ? [selected] : []);
   let mode = points.length > 1 ? 'edit' : 'draw';
   let plane = 'xy';
   let width = 600;
@@ -35,6 +37,7 @@ export function openPathEditor({ path, onApply, minPoints = 2 }) {
       <div class="path-editor-tools" role="group" aria-label="Drawing tools">
         <button type="button" data-mode="draw" title="Draw connected vertices (D)">Draw</button>
         <button type="button" data-mode="edit" title="Select and move vertices (V)">Move</button>
+        <button type="button" data-mode="select" title="Select several vertices (S)">Select</button>
         <button type="button" data-mode="freehand" title="Draw a freehand stroke (F)">Freehand</button>
         <button type="button" data-mode="pan" title="Pan the canvas (H)">Pan</button>
       </div>
@@ -55,11 +58,24 @@ export function openPathEditor({ path, onApply, minPoints = 2 }) {
         <div class="path-editor-checks"><label><input type="checkbox" data-field="closed"> Closed loop</label><label><input type="checkbox" data-field="smooth"> Smooth curve</label></div>
         <div class="path-editor-snap"><label><input type="checkbox" data-field="snap"> Snap to grid</label><label class="path-editor-inline">Step <input type="number" data-field="step" value="10" min="0.01" max="1000" step="any" aria-label="Grid snapping step"></label></div>
         <label class="path-editor-depth"><span>New point <b data-field="depth-axis">Z</b></span><input type="number" data-field="depth" value="0" min="-5000" max="5000" step="any" aria-label="New point depth"></label>
-        <div class="path-editor-vertex-heading"><h3>Selected vertex</h3><div class="path-editor-vertex-nav"><button type="button" data-action="previous" aria-label="Select previous vertex">‹</button><input type="number" data-field="vertex" min="1" step="1" aria-label="Selected vertex number"><button type="button" data-action="next" aria-label="Select next vertex">›</button></div></div>
+        <div class="path-editor-selection">
+          <div class="path-editor-property-heading"><h3>Selection</h3><output data-field="selection-count" aria-live="polite"></output></div>
+          <div class="path-editor-selection-actions"><button type="button" data-action="select-all">All</button><button type="button" data-action="select-none">None</button><button type="button" data-action="select-invert">Invert</button></div>
+        </div>
+        <div class="path-editor-vertex-heading"><h3>Active vertex</h3><div class="path-editor-vertex-nav"><button type="button" data-action="previous" aria-label="Select previous vertex">‹</button><input type="number" data-field="vertex" min="1" step="1" aria-label="Selected vertex number"><button type="button" data-action="next" aria-label="Select next vertex">›</button></div></div>
         <div class="path-editor-coordinates">${['x', 'y', 'z'].map(axis => `<label>${axis.toUpperCase()}<input type="number" data-coordinate="${axis}" min="-5000" max="5000" step="any" aria-label="Vertex ${axis.toUpperCase()} coordinate"></label>`).join('')}</div>
         <div class="path-editor-node-actions"><button type="button" data-action="insert">Insert vertex</button><button type="button" data-action="delete">Delete vertex</button></div>
+        <details class="path-editor-transforms">
+          <summary>Transform selection</summary>
+          <p class="path-editor-note">Scale, then rotate X → Y → Z around the selection center, then move. Negative scale mirrors; zero flattens.</p>
+          <output data-field="selection-center" class="path-editor-center"></output>
+          ${[['move', 'Move', 0], ['rotate', 'Rotate °', 0], ['scale', 'Scale ×', 1]].map(([name, label, initial]) => `<fieldset class="path-editor-transform-row"><legend>${label}</legend>${['x', 'y', 'z'].map(axis => `<label>${axis.toUpperCase()}<input type="number" data-transform="${name}.${axis}" value="${initial}" step="any" aria-label="${name === 'rotate' ? 'Rotate' : name === 'scale' ? 'Scale' : 'Move'} selection ${axis.toUpperCase()}"></label>`).join('')}</fieldset>`).join('')}
+          <button type="button" data-action="transform-selection">Transform selected</button>
+          <div class="path-editor-flatten"><label>Axis<select data-field="flatten-axis" aria-label="Flatten selection axis"><option value="x">X</option><option value="y">Y</option><option value="z" selected>Z</option></select></label><label>Coordinate<input type="number" data-field="flatten-value" value="0" min="-5000" max="5000" step="any" aria-label="Flatten selection coordinate"></label></div>
+          <button type="button" data-action="flatten-selection">Set selected to coordinate</button>
+        </details>
         <p class="path-editor-note">Insert adds a midpoint after the selected vertex. Change planes or enter coordinates to draw in 3D. Cross edges and combine layers to build complex shapes.</p>
-        <p class="path-editor-note" id="path-editor-keyboard">Canvas: arrows move a vertex; Shift moves 10×. Delete removes it. D / V / F / H switch tools. Ctrl or ⌘ Z undoes.</p>
+        <p class="path-editor-note" id="path-editor-keyboard">Canvas: Shift-click toggles selection. Arrows move selected vertices; Shift moves 10×. Delete removes selected vertices. D / V / S / F / H switch tools. Ctrl or ⌘ A selects all; Z undoes.</p>
       </aside>
     </div>
     <footer class="path-editor-footer">
@@ -77,10 +93,11 @@ export function openPathEditor({ path, onApply, minPoints = 2 }) {
     $('#path-editor-title').textContent = 'Shape your point cloud';
     $('.path-editor-checks').hidden = true;
     action('apply').textContent = 'Apply points';
-    $('.path-editor-note').textContent = 'Each vertex is a separate point. Change planes or enter coordinates to arrange your points in 3D.';
+    $('.path-editor-properties > .path-editor-note').textContent = 'Each vertex is a separate point. Change planes or enter coordinates to arrange your points in 3D.';
   }
-  const state = () => ({ draft: copy(draft), selected });
-  const restore = snapshot => { draft = copy(snapshot.draft); selected = snapshot.selected; refresh(); };
+  const selectOnly = index => { selected = index; selection = new Set(index >= 0 ? [index] : []); };
+  const state = () => ({ draft: copy(draft), selected, selection: [...selection] });
+  const restore = snapshot => { draft = copy(snapshot.draft); selected = snapshot.selected; selection = new Set(snapshot.selection); refresh(); };
   const remember = snapshot => { undoStack.push(snapshot); if (undoStack.length > 80) undoStack.shift(); redoStack = []; };
   const change = fn => { remember(state()); fn(); refresh(); };
   const axes = () => PLANES[plane];
@@ -99,18 +116,23 @@ export function openPathEditor({ path, onApply, minPoints = 2 }) {
   const setMode = next => { mode = next; hover = null; refresh(); };
   function refresh() {
     if (!alive) return;
-    selected = Math.min(selected, draft.points.length - 1);
-    if (selected < 0 && draft.points.length) selected = 0;
+    selection = new Set([...selection].filter(index => index >= 0 && index < draft.points.length));
+    if (!selection.has(selected)) selected = [...selection].at(-1) ?? -1;
     dialog.querySelectorAll('[data-mode]').forEach(button => button.setAttribute('aria-pressed', String(button.dataset.mode === mode)));
     canvas.dataset.mode = mode;
     field('closed').checked = draft.closed;
     field('smooth').checked = draft.smooth;
     field('count').textContent = `${draft.points.length.toLocaleString()} vertices`;
+    field('selection-count').textContent = `${selection.size.toLocaleString()} selected`;
+    field('selection-center').textContent = selection.size ? `Center: ${Object.entries(selectionCenter(draft.points, selection)).map(([axis, value]) => `${axis.toUpperCase()} ${rounded(value)}`).join(' · ')}` : 'Select vertices to transform.';
     field('vertex').value = selected >= 0 ? selected + 1 : '';
     field('vertex').max = draft.points.length;
     field('vertex').disabled = selected < 0;
     dialog.querySelectorAll('[data-coordinate]').forEach(input => { input.disabled = selected < 0; input.value = selected < 0 ? '' : rounded(draft.points[selected][input.dataset.coordinate]); });
-    ['delete', 'previous', 'next'].forEach(name => { action(name).disabled = selected < 0; });
+    action('delete').disabled = !selection.size;
+    action('delete').textContent = selection.size > 1 ? 'Delete selected' : 'Delete vertex';
+    ['previous', 'next', 'select-all', 'select-invert'].forEach(name => { action(name).disabled = !draft.points.length; });
+    ['select-none', 'transform-selection', 'flatten-selection'].forEach(name => { action(name).disabled = !selection.size; });
     action('remove-last').disabled = !draft.points.length;
     action('clear').disabled = !draft.points.length;
     action('insert').disabled = draft.points.length >= MAX_PATH_POINTS;
@@ -120,7 +142,8 @@ export function openPathEditor({ path, onApply, minPoints = 2 }) {
     action('apply').disabled = draft.points.length < minPoints;
     $('.path-editor-instructions').textContent = {
       draw: pointCloud ? 'Click or tap to place separate points. Switch planes to arrange them in 3D.' : 'Click or tap to connect vertices. Click the first vertex to close your outline. Crossings are welcome.',
-      edit: 'Drag a vertex to reshape the path. Select a vertex to edit its exact coordinates.',
+      edit: 'Drag a selected vertex to move the selection. Shift-click toggles vertices. Select a vertex to edit its exact coordinates.',
+      select: 'Tap vertices to add or remove them from the selection. Drag empty space to select a box. Switch to Move to drag the selection.',
       freehand: pointCloud ? 'Drag to place points along a stroke. Undo removes the entire stroke.' : 'Drag to sketch a connected stroke. Enable Smooth curve for flowing lines; Undo removes the stroke.',
       pan: 'Drag to move the canvas. Scroll to zoom, or use + / −. Fit brings the whole path into view.'
     }[mode];
@@ -170,10 +193,16 @@ export function openPathEditor({ path, onApply, minPoints = 2 }) {
     draft.points.forEach((point, index) => {
       const p = pixel(point);
       if (p.x < -20 || p.x > width + 20 || p.y < -20 || p.y > height + 20) return;
-      const active = selected === index;
-      ctx.beginPath(); ctx.arc(p.x, p.y, active ? 6 : draft.points.length > 180 ? 2.4 : 4, 0, Math.PI * 2);
-      ctx.fillStyle = active ? '#d4ef9d' : '#202b1c'; ctx.fill(); ctx.strokeStyle = active ? '#f3ffe2' : '#afc58e'; ctx.lineWidth = active ? 2 : 1.2; ctx.stroke();
+      const active = selected === index, chosen = selection.has(index);
+      ctx.beginPath(); ctx.arc(p.x, p.y, active ? 6 : chosen ? 5 : draft.points.length > 180 ? 2.4 : 4, 0, Math.PI * 2);
+      ctx.fillStyle = chosen ? '#d4ef9d' : '#202b1c'; ctx.fill(); ctx.strokeStyle = active ? '#f3ffe2' : '#afc58e'; ctx.lineWidth = active ? 2 : 1.2; ctx.stroke();
     });
+    if (drag?.type === 'select') {
+      const x = Math.min(drag.position.x, drag.current.x), y = Math.min(drag.position.y, drag.current.y);
+      const w = Math.abs(drag.current.x - drag.position.x), h = Math.abs(drag.current.y - drag.position.y);
+      ctx.fillStyle = '#d4ef9d16'; ctx.fillRect(x, y, w, h);
+      ctx.strokeStyle = '#d4ef9d'; ctx.lineWidth = 1; ctx.setLineDash([5, 4]); ctx.strokeRect(x, y, w, h); ctx.setLineDash([]);
+    }
     if (!pointCloud && draft.points.length) {
       const first = pixel(draft.points[0]);
       const closing = mode === 'draw' && draft.points.length >= 3 && hover && hit(hover) === 0;
@@ -212,13 +241,20 @@ export function openPathEditor({ path, onApply, minPoints = 2 }) {
     const point = { [horizontal]: snap(location.x), [vertical]: snap(location.y), [depth]: bound(Number(field('depth').value) || 0) };
     const last = draft.points.at(-1);
     if (last && ['x', 'y', 'z'].every(axis => point[axis] === last[axis])) return false;
-    draft.points.push(point); selected = draft.points.length - 1; return true;
+    draft.points.push(point); selectOnly(draft.points.length - 1); return true;
   }
   function finishPointer(event, cancelled = false) {
     if (!drag || event.pointerId !== drag.id) return;
     const previous = drag;
     drag = null;
-    if (cancelled && previous.before) { draft = previous.before.draft; selected = previous.before.selected; }
+    if (cancelled && previous.before) { draft = previous.before.draft; selected = previous.before.selected; selection = new Set(previous.before.selection); }
+    else if (previous.type === 'select') {
+      const lowX = Math.min(previous.position.x, previous.current.x), highX = Math.max(previous.position.x, previous.current.x);
+      const lowY = Math.min(previous.position.y, previous.current.y), highY = Math.max(previous.position.y, previous.current.y);
+      selection = new Set(previous.additive ? previous.before.selection : []);
+      draft.points.forEach((point, index) => { const p = pixel(point); if (p.x >= lowX && p.x <= highX && p.y >= lowY && p.y <= highY) selection.add(index); });
+      selected = [...selection].at(-1) ?? -1;
+    }
     else if (previous.before && JSON.stringify(draft) !== JSON.stringify(previous.before.draft)) remember(previous.before);
     if (canvas.hasPointerCapture(event.pointerId)) canvas.releasePointerCapture(event.pointerId);
     refresh();
@@ -229,15 +265,24 @@ export function openPathEditor({ path, onApply, minPoints = 2 }) {
     event.preventDefault(); canvas.focus({ preventScroll: true });
     const position = pointer(event);
     if (mode === 'pan' || event.button === 1) { drag = { id: event.pointerId, type: 'pan', position, view: { ...view } }; }
-    else if (mode === 'edit') {
-      selected = hit(position, event.pointerType === 'touch' ? 22 : 13);
-      if (selected >= 0) drag = { id: event.pointerId, type: 'edit', position, point: { ...draft.points[selected] }, before: state() };
+    else if (mode === 'edit' || mode === 'select') {
+      const index = hit(position, event.pointerType === 'touch' ? 22 : 13);
+      if (index >= 0 && (event.shiftKey || mode === 'select')) {
+        if (selection.has(index)) { selection.delete(index); selected = [...selection].at(-1) ?? -1; }
+        else { selection.add(index); selected = index; }
+      } else if (index >= 0) {
+        if (!selection.has(index)) selectOnly(index);
+        selected = index;
+        drag = { id: event.pointerId, type: 'edit', position, point: { ...draft.points[index] }, before: state() };
+      } else if (mode === 'select') {
+        drag = { id: event.pointerId, type: 'select', position, current: position, additive: event.shiftKey, before: state() };
+      } else if (!event.shiftKey) selectOnly(-1);
       refresh();
     } else if (mode === 'freehand') {
       drag = { id: event.pointerId, type: 'freehand', position, before: state() };
       draft.closed = false; addAt(position); refresh();
     } else {
-      if (!pointCloud && draft.points.length >= 3 && hit(position, event.pointerType === 'touch' ? 22 : 13) === 0) change(() => { draft.closed = true; mode = 'edit'; selected = 0; });
+      if (!pointCloud && draft.points.length >= 3 && hit(position, event.pointerType === 'touch' ? 22 : 13) === 0) change(() => { draft.closed = true; mode = 'edit'; selectOnly(0); });
       else if (draft.points.length < MAX_PATH_POINTS) {
         const before = state();
         if (addAt(position)) { remember(before); refresh(); }
@@ -250,10 +295,14 @@ export function openPathEditor({ path, onApply, minPoints = 2 }) {
     if (!drag) { if (mode === 'draw') render(); return; }
     if (drag.id !== event.pointerId) return;
     if (drag.type === 'pan') { view.x = drag.view.x - (position.x - drag.position.x) / view.scale; view.y = drag.view.y + (position.y - drag.position.y) / view.scale; render(); }
+    else if (drag.type === 'select') { drag.current = position; render(); }
     else if (drag.type === 'edit') {
       const [horizontal, vertical] = axes();
-      draft.points[selected][horizontal] = snap(drag.point[horizontal] + (position.x - drag.position.x) / view.scale);
-      draft.points[selected][vertical] = snap(drag.point[vertical] - (position.y - drag.position.y) / view.scale);
+      const translation = boundedTranslation(drag.before.draft.points, drag.before.selection, {
+        [horizontal]: snap(drag.point[horizontal] + (position.x - drag.position.x) / view.scale) - drag.point[horizontal],
+        [vertical]: snap(drag.point[vertical] - (position.y - drag.position.y) / view.scale) - drag.point[vertical]
+      });
+      draft.points = transformVertices(drag.before.draft.points, drag.before.selection, { translation });
       refresh();
     } else if (Math.hypot(position.x - drag.position.x, position.y - drag.position.y) >= 5) {
       if (addAt(position)) { drag.position = position; refresh(); }
@@ -278,10 +327,38 @@ export function openPathEditor({ path, onApply, minPoints = 2 }) {
         const next = draft.points[selected + 1] || (draft.closed ? draft.points[0] : null);
         point = next ? Object.fromEntries(['x', 'y', 'z'].map(axis => [axis, rounded((current[axis] + next[axis]) / 2)])) : { ...current, [axes()[0]]: bound(current[axes()[0]] + step()) };
       }
-      selected += 1; draft.points.splice(selected, 0, point); mode = 'edit';
+      const index = selected + 1; draft.points.splice(index, 0, point); selectOnly(index); mode = 'edit';
     });
   }
-  function remove() { if (selected >= 0) change(() => { draft.points.splice(selected, 1); selected = Math.min(selected, draft.points.length - 1); }); }
+  function remove() {
+    if (selection.size) change(() => {
+      const first = Math.min(...selection);
+      draft.points = draft.points.filter((_, index) => !selection.has(index));
+      selectOnly(Math.min(first, draft.points.length - 1));
+    });
+  }
+  function updateSelection(fn) {
+    if (!selection.size) return;
+    try {
+      const next = fn();
+      if (JSON.stringify(next) !== JSON.stringify(draft.points)) change(() => { draft.points = next; });
+      else report('The selected vertices already match this transform.');
+    } catch (error) { report(error.message); }
+  }
+  function transformSelection() {
+    updateSelection(() => {
+      const options = {};
+      for (const [name, key] of [['move', 'translation'], ['rotate', 'rotation'], ['scale', 'scale']]) {
+        options[key] = {};
+        for (const axis of ['x', 'y', 'z']) {
+          const input = $(`[data-transform="${name}.${axis}"]`);
+          if (!input.value.trim() || !Number.isFinite(Number(input.value))) throw new Error('Enter finite numbers for every transform coordinate.');
+          options[key][axis] = Number(input.value);
+        }
+      }
+      return transformVertices(draft.points, selection, options);
+    });
+  }
   function undo() { if (undoStack.length) { redoStack.push(state()); restore(undoStack.pop()); } }
   function redo() { if (redoStack.length) { undoStack.push(state()); restore(redoStack.pop()); } }
   dialog.addEventListener('click', event => {
@@ -294,12 +371,20 @@ export function openPathEditor({ path, onApply, minPoints = 2 }) {
       case 'frame': fit(); break;
       case 'zoom-in': zoom(1.35); break;
       case 'zoom-out': zoom(1 / 1.35); break;
-      case 'previous': selected = (selected - 1 + draft.points.length) % draft.points.length; refresh(); break;
-      case 'next': selected = (selected + 1) % draft.points.length; refresh(); break;
+      case 'previous': selectOnly(selected < 0 ? draft.points.length - 1 : (selected - 1 + draft.points.length) % draft.points.length); refresh(); break;
+      case 'next': selectOnly((selected + 1) % draft.points.length); refresh(); break;
+      case 'select-all': selection = new Set(draft.points.map((_, index) => index)); refresh(); break;
+      case 'select-none': selectOnly(-1); refresh(); break;
+      case 'select-invert': selection = new Set(draft.points.map((_, index) => index).filter(index => !selection.has(index))); refresh(); break;
+      case 'transform-selection': transformSelection(); break;
+      case 'flatten-selection': updateSelection(() => {
+        if (!field('flatten-value').value.trim()) throw new Error('Enter a finite coordinate.');
+        return flattenVertices(draft.points, selection, field('flatten-axis').value, Number(field('flatten-value').value));
+      }); break;
       case 'insert': insert(); break;
       case 'delete': remove(); break;
-      case 'remove-last': if (draft.points.length) change(() => { draft.points.pop(); }); break;
-      case 'clear': if (draft.points.length) change(() => { draft.points = []; selected = -1; mode = 'draw'; }); break;
+      case 'remove-last': if (draft.points.length) change(() => { draft.points.pop(); selection.delete(draft.points.length); if (!selection.size) selectOnly(draft.points.length - 1); }); break;
+      case 'clear': if (draft.points.length) change(() => { draft.points = []; selectOnly(-1); mode = 'draw'; }); break;
       case 'undo': undo(); break;
       case 'redo': redo(); break;
     }
@@ -311,7 +396,7 @@ export function openPathEditor({ path, onApply, minPoints = 2 }) {
   field('snap').addEventListener('change', render);
   field('step').addEventListener('change', () => { field('step').value = step(); render(); });
   field('depth').addEventListener('change', () => { field('depth').value = bound(Number(field('depth').value) || 0); });
-  field('vertex').addEventListener('change', event => { selected = Math.max(0, Math.min(draft.points.length - 1, (Math.round(Number(event.target.value)) || 1) - 1)); refresh(); });
+  field('vertex').addEventListener('change', event => { selectOnly(Math.max(0, Math.min(draft.points.length - 1, (Math.round(Number(event.target.value)) || 1) - 1))); refresh(); });
   dialog.querySelectorAll('[data-coordinate]').forEach(input => input.addEventListener('change', () => {
     const value = Number(input.value);
     if (selected < 0 || !input.value.trim() || !Number.isFinite(value)) { refresh(); report('Enter a finite coordinate between −5000 and 5000.'); return; }
@@ -327,8 +412,9 @@ export function openPathEditor({ path, onApply, minPoints = 2 }) {
     const key = event.key.toLowerCase();
     if ((event.ctrlKey || event.metaKey) && key === 'z') { event.preventDefault(); if (event.shiftKey) redo(); else undo(); return; }
     if ((event.ctrlKey || event.metaKey) && key === 'y') { event.preventDefault(); redo(); return; }
+    if ((event.ctrlKey || event.metaKey) && key === 'a') { event.preventDefault(); selection = new Set(draft.points.map((_, index) => index)); refresh(); return; }
     if (event.ctrlKey || event.metaKey || event.altKey) return;
-    if ({ d: 'draw', v: 'edit', f: 'freehand', h: 'pan' }[key]) { event.preventDefault(); setMode({ d: 'draw', v: 'edit', f: 'freehand', h: 'pan' }[key]); return; }
+    if ({ d: 'draw', v: 'edit', s: 'select', f: 'freehand', h: 'pan' }[key]) { event.preventDefault(); setMode({ d: 'draw', v: 'edit', s: 'select', f: 'freehand', h: 'pan' }[key]); return; }
     if (event.target !== canvas) return;
     if (key === 'delete' || key === 'backspace') { event.preventDefault(); remove(); }
     if (key === 'insert') { event.preventDefault(); insert(); }
@@ -339,7 +425,8 @@ export function openPathEditor({ path, onApply, minPoints = 2 }) {
     const movements = { arrowleft: [0, -1], arrowright: [0, 1], arrowup: [1, 1], arrowdown: [1, -1] };
     if (movements[key] && selected >= 0) {
       event.preventDefault(); const [axisIndex, direction] = movements[key]; const axis = axes()[axisIndex];
-      change(() => { draft.points[selected][axis] = rounded(bound(draft.points[selected][axis] + direction * (field('snap').checked ? step() : 1) * (event.shiftKey ? 10 : 1))); });
+      const translation = boundedTranslation(draft.points, selection, { [axis]: direction * (field('snap').checked ? step() : 1) * (event.shiftKey ? 10 : 1) });
+      updateSelection(() => transformVertices(draft.points, selection, { translation }));
     }
   });
   const resize = new ResizeObserver(() => {

@@ -1,6 +1,6 @@
 import { readSVG, readCoordinates } from '../importers/geometry.mjs';
 import { sampleFormula } from '../geometry/formula.mjs';
-import { createLayer, sampleProject } from '../model.mjs';
+import { createLayer, sampleProject, DEFAULT_PART_COUNT } from '../model.mjs';
 import { Viewport } from '../viewport.mjs';
 
 export function openSourceEditor({ mode = 'svg', onApply, remainingLayers = 64 } = {}) {
@@ -66,7 +66,7 @@ export function openSourceEditor({ mode = 'svg', onApply, remainingLayers = 64 }
   function preview() {
     const specs = generate();
     const layers = specs.map((spec, i) => createLayer(spec.type, { ...spec, position: { x: 0, y: 0, z: 0 }, color: ['#d4ef9d', '#b8a4ff', '#79d9ea'][i % 3] }));
-    const points = sampleProject({ version: 1, layers, controls: [], parts: Math.min(8192, Math.max(640, specs.reduce((n, layer) => n + layer.path.points.length, 0))) }, 0);
+    const points = sampleProject({ version: 1, layers, controls: [], parts: Math.min(8192, Math.max(DEFAULT_PART_COUNT, specs.reduce((n, layer) => n + layer.path.points.length, 0))) }, 0);
     viewport.setPoints(points); viewport.fit();
     $('source-summary').textContent = `${specs.length} layer${specs.length === 1 ? '' : 's'} · ${specs.reduce((n, spec) => n + spec.path.points.length, 0).toLocaleString()} vertices`;
     $('source-error').textContent = '';

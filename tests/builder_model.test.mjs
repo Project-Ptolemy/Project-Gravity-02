@@ -27,9 +27,12 @@ function uniformCdf(values, label, tolerance = 0.004) {
 
 for (const preset of ['orbit', 'helix', 'solar', 'blank']) {
   const project = createProject(preset);
+  assert.equal(project.parts, 128, 'new scenes start with 128 preview parts');
   assert.deepEqual(normalizeProject(project), project);
   assert.equal(sampleProject(project).length, preset === 'blank' ? 0 : project.parts);
 }
+assert.equal(normalizeProject({ version: 1, layers: [] }).parts, 128, 'projects without a count use the new default');
+assert.equal(normalizeProject({ version: 1, layers: [], parts: 640 }).parts, 640, 'saved preview counts remain unchanged');
 for (const type of LAYER_TYPES) {
   for (const fill of [false, true]) {
     for (const parts of [1, 17, 640]) {
