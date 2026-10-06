@@ -1,4 +1,4 @@
-import { createProject, createLayer, normalizeProject, sampleProject, controlDivisor, BOOLEAN_DEFS, applyPreviewAction, PROPERTY_DEFS, LAYER_TYPES, getProperty, setProperty } from './model.mjs';
+import { createProject, createLayer, normalizeProject, sampleProject, resolveLayers, controlDivisor, BOOLEAN_DEFS, applyPreviewAction, PROPERTY_DEFS, LAYER_TYPES, FLOW_LAYER_TYPES, getProperty, setProperty } from './model.mjs';
 import { exportLua } from './exporter.mjs';
 import { Viewport } from './viewport.mjs';
 import { openPathEditor } from './editors/path-editor.mjs';
@@ -71,7 +71,7 @@ let playing = !matchMedia('(prefers-reduced-motion: reduce)').matches;
 let speed = 1;
 let dirty = true;
 let activeTab = 'properties';
-let grid = true, axes = true, core = true, moveLayers = true;
+let grid = true, axes = true, core = true, moveLayers = true, trackPart = false;
 let dragSession = null;
 let editingControl = null;
 let suggestedControlName = '';
@@ -207,6 +207,7 @@ const geometry = {
 };
 const sectionProperties = {
   transform: ['position.x', 'position.y', 'position.z', 'rotation.x', 'rotation.y', 'rotation.z', 'scale.x', 'scale.y', 'scale.z'],
+  'part-motion': ['flowSpeed', 'partMoveX', 'partMoveY', 'partMoveZ', 'partMoveSpeed', 'partMoveSpread', 'partMovePhase', 'partMovePhaseY', 'partMovePhaseZ'],
   spin: ['spin', 'spinX', 'spinZ', 'timeScale', 'timeOffset'],
   orbit: ['orbitRadius', 'orbitAspect', 'orbitSpeed', 'orbitTiltX', 'orbitTiltZ', 'orbitPhase'],
   bob: ['bobAmount', 'bobSpeed', 'bobPhase'],
@@ -214,7 +215,7 @@ const sectionProperties = {
   wave: ['wave', 'waveSpeed', 'waveCount', 'wavePhase'],
   deform: ['twist', 'taper', 'scatter'],
 };
-function availableProperties(layer) { return [...new Set([...geometry[layer.type], 'weight', 'phase', ...Object.values(sectionProperties).flat()])]; }
+function availableProperties(layer) { return [...new Set([...geometry[layer.type], 'weight', 'phase', ...Object.values(sectionProperties).flat()])].filter(property => property !== 'flowSpeed' || FLOW_LAYER_TYPES.includes(layer.type)); }
 function propertyGroup(id, title, symbol, content, count) {
   return `<details class="property-section property-group" data-section="${id}" ${openSections.get(id) ? 'open' : ''}><summary><span class="section-symbol">${icon(symbol)}</span><span>${title}</span>${count ? `<span class="controls-counter">${count}</span>` : ''}<span class="disclosure-arrow">${icon('chevron')}</span></summary>${content}<button class="text-button section-reset" data-reset-section="${id}" title="Reset ${title.toLowerCase()} values, keeping any control limits">${icon('restart')}Reset ${title.toLowerCase()}</button></details>`;
 }
@@ -232,7 +233,7 @@ function rangeField(layer, property, label, unit = '', visualMax) {
   const config = propertyConfig(property, layer), value = fieldValue(layer, property);
   const bound = project.controls.some(control => control.layerId === layer.id && control.property === property);
   const rangeMax = Math.min(config.max, Math.max(visualMax ?? config.max, value));
-  const rangeMin = Math.max(config.min, property.startsWith('spin') ? Math.min(-90, value) : config.min);
+  const rangeMin = Math.max(config.min, property.startsWith('spin') ? Math.min(-90, value) : property === 'flowSpeed' ? Math.min(-50, value) : config.min);
   return `<div class="property-row"><label for="prop-${property}">${escapeHTML(label || config.label)}${unit ? `<small>${unit}</small>` : ''}</label><input id="prop-${property}" data-prop="${property}" type="number" value="${format(value)}" min="${config.min}" max="${config.max}" step="any" aria-label="${escapeHTML(label || config.label)}"><button class="expose-button" data-expose="${property}" title="${bound ? 'Edit' : 'Add'} in-game control for ${escapeHTML(config.label)}" aria-label="${bound ? 'Edit' : 'Add'} ${escapeHTML(config.label)} control">${icon(bound ? 'sliders' : 'plus')}</button><input data-prop="${property}" type="range" value="${value}" min="${rangeMin}" max="${rangeMax}" step="${config.step}" aria-label="${escapeHTML(label || config.label)} slider"></div>`;
 }
 function transformRow(layer, group, label, unit) {
@@ -248,6 +249,7 @@ function renderProperties() {
   ${customGeometryFields(layer)}
   ${propertyGroup('transform', 'Transform', 'axes', transformRow(layer, 'position', 'Position', 'studs') + transformRow(layer, 'rotation', 'Rotation', 'degrees') + transformRow(layer, 'scale', 'Scale', '×'), 9)}
   ${propertyGroup('geometry', 'Geometry', layer.type, geometry[layer.type].map(property => rangeField(layer, property, layer.type === 'line' && property === 'width' ? 'Length' : null, property === 'arc' ? '°' : ['turns', 'sides'].includes(property) ? '' : 'studs', property === 'arc' ? 360 : property === 'sides' ? 16 : property === 'turns' ? 10 : 100)).join('') + (!['grid', 'pointcloud'].includes(layer.type) ? `<label class="checkbox-row"><input id="fill-volume" type="checkbox" ${fieldValue(layer, 'fill') ? 'checked' : ''}>${layer.type === 'path' ? 'Fill tube cross-section' : layer.type === 'polygon' ? 'Fill polygon interior' : 'Fill the interior'}</label>` : '') + rangeField(layer, 'weight', 'Part weight', '×', 5) + rangeField(layer, 'phase', 'Base phase', '°', 360) + '<p class="section-note">Weight sets this layer’s share of the debris. Base phase offsets the shape, pulse, and wave.</p>')}
+  ${propertyGroup('part-motion', 'Part movement', 'path', partMovementFields(layer))}
   ${propertyGroup('spin', 'Spin & timing', 'restart', rangeField(layer, 'spin', 'Spin Y', '°/s', 90) + rangeField(layer, 'spinX', 'Spin X', '°/s', 90) + rangeField(layer, 'spinZ', 'Spin Z', '°/s', 90) + rangeField(layer, 'timeScale', 'Time scale', '×', 4) + rangeField(layer, 'timeOffset', 'Time offset', 's', 60) + '<p class="section-note">Time scale affects all motion on this layer. Zero freezes it; a negative value reverses it.</p>', 5)}
   ${propertyGroup('orbit', 'Orbit', 'orbit', '<p class="section-note motion-note">Move the whole layer around its position. Spin still rotates the shape itself.</p>' + rangeField(layer, 'orbitRadius', 'Orbit radius', 'studs', 150) + rangeField(layer, 'orbitAspect', 'Ellipse aspect', 'Z / X', 3) + rangeField(layer, 'orbitSpeed', 'Orbit speed', '°/s', 90) + rangeField(layer, 'orbitTiltX', 'Tilt X', '°', 180) + rangeField(layer, 'orbitTiltZ', 'Tilt Z', '°', 180) + rangeField(layer, 'orbitPhase', 'Orbit phase', '°', 360), 6)}
   ${propertyGroup('bob', 'Float & bob', 'arrow-up', rangeField(layer, 'bobAmount', 'Bob height', 'studs', 60) + rangeField(layer, 'bobSpeed', 'Bob frequency', 'Hz', 3) + rangeField(layer, 'bobPhase', 'Bob phase', '°', 360) + '<p class="section-note">Moves the whole layer up and down in world space. Height is the distance from center to peak.</p>', 3)}
@@ -255,6 +257,18 @@ function renderProperties() {
   ${propertyGroup('wave', 'Wave', 'helix', rangeField(layer, 'wave', 'Wave height', 'studs', 50) + rangeField(layer, 'waveSpeed', 'Wave frequency', 'Hz', 3) + rangeField(layer, 'waveCount', 'Wave count', 'cycles', 10) + rangeField(layer, 'wavePhase', 'Wave phase', '°', 360) + '<p class="section-note">Wave count sets the number of crests along the point sequence. The wave follows local Y before rotation.</p>', 4)}
   ${propertyGroup('deform', 'Deform & scatter', 'sliders', rangeField(layer, 'twist', 'Twist along path', '°', 360) + rangeField(layer, 'taper', 'Taper along path', '%', 90) + rangeField(layer, 'scatter', 'Scatter distance', 'studs', 50) + '<p class="section-note">Twist and taper follow the point sequence. Scatter adds a stable offset to each point; it does not flicker between frames.</p>', 3)}
   <section class="property-section"><h3>Preview color<span>${icon('eye')}</span></h3><div class="color-row">${colors.map(color => `<button class="color-swatch ${layer.color.toLowerCase() === color ? 'selected' : ''}" style="--swatch:${color}" data-color="${color}" aria-label="Set preview color ${color}"></button>`).join('')}<input type="color" id="layer-color" value="${layer.color}" aria-label="Custom preview color"><span class="color-value">${layer.color.toUpperCase()}</span></div><p class="section-note">Helps you identify layers. Original part colors are kept in game.</p></section>`;
+}
+function partMovementFields(layer) {
+  const flow = FLOW_LAYER_TYPES.includes(layer.type);
+  return '<p class="section-note motion-note">Move individual pieces while keeping the layer in place. Combine path flow with local X, Y and Z motion.</p>' +
+    `<button id="toggle-part-tracker" class="secondary-button part-tracker" aria-pressed="${trackPart}">${icon('eye')}${trackPart ? 'Tracking part 1' : 'Track a part'}</button>` +
+    '<p class="section-note motion-note">The amber marker follows one piece. It makes movement easier to see on evenly spaced outlines.</p>' +
+    (flow ? rangeField(layer, 'flowSpeed', 'Path flow speed', 'stud/s', 50) + '<p class="section-note motion-note">Closed outlines circulate; open outlines travel back and forth. Negative speed reverses the flow. Speed follows local outline length, before layer scaling.</p>' : '<p class="section-note motion-note">Path flow is available on paths, polygons, rings and lines. Separate points keep their own positions as the offsets below move them.</p>') +
+    ['X', 'Y', 'Z'].map(axis => rangeField(layer, 'partMove' + axis, axis + ' distance', 'studs', 30)).join('') +
+    rangeField(layer, 'partMoveSpeed', 'Movement frequency', 'Hz', 3) +
+    rangeField(layer, 'partMoveSpread', 'Stagger across parts', 'cycles', 4) +
+    '<p class="section-note motion-note">Set a distance above zero to animate. Stagger 0 moves pieces together; 1 spreads one full wave across them. Equal X and Y distances with a 90° Y phase create individual orbits.</p>' +
+    `<details class="part-axis-phases"><summary>Axis phases</summary>${rangeField(layer, 'partMovePhase', 'Starting phase', '°', 360)}${rangeField(layer, 'partMovePhaseY', 'Y phase offset', '°', 360)}${rangeField(layer, 'partMovePhaseZ', 'Z phase offset', '°', 360)}</details>`;
 }
 function customGeometryFields(layer) {
   if (layer.type === 'polygon') return `<section class="custom-geometry-panel"><p>Choose the number of sides below. Convert to a path to move each vertex freely.</p><button id="convert-path" class="secondary-button">${icon('edit')}Edit individual vertices</button></section>`;
@@ -280,7 +294,7 @@ function renderAll() {
   renderTitle(); renderLayers(); renderProperties(); renderControls(); updateHistory();
   if (!$('part-count').querySelector(`option[value="${project.parts}"]`)) $('part-count').add(new Option(`${project.parts.toLocaleString()} parts`, project.parts));
   $('part-count').value = project.parts; $('point-size').value = project.pointSize;
-  viewport.setOptions({ pointSize: project.pointSize, grid, axes, core, coreRadius: 2.5, move: moveLayers }); dirty = true;
+  viewport.setOptions({ pointSize: project.pointSize, grid, axes, core, coreRadius: 2.5, move: moveLayers, trackPart }); dirty = true;
 }
 function setTab(tab) {
   activeTab = tab;
@@ -497,7 +511,31 @@ async function copyLua() {
   try { await navigator.clipboard.writeText($('export-code').value); toast('Lua plugin copied to clipboard.'); }
   catch { $('export-code').focus(); $('export-code').select(); try { if (document.execCommand('copy')) { toast('Lua plugin copied to clipboard.'); return; } } catch {} toast('Select and copy the highlighted Lua, or download the plugin.'); }
 }
-function updatePlayback() { $('play-pause').innerHTML = icon(playing ? 'pause' : 'play'); $('play-pause').setAttribute('aria-label', playing ? 'Pause animation' : 'Play animation'); $('preview-status').textContent = playing ? 'Live preview' : 'Preview paused'; }
+function hasMotion(layer) {
+  return layer.spin || layer.spinX || layer.spinZ ||
+    (layer.pulse && layer.pulseSpeed) || (layer.wave && layer.waveSpeed) ||
+    (layer.orbitRadius && layer.orbitSpeed) || (layer.bobAmount && layer.bobSpeed) ||
+    (FLOW_LAYER_TYPES.includes(layer.type) && layer.flowSpeed) ||
+    ((layer.partMoveX || layer.partMoveY || layer.partMoveZ) && layer.partMoveSpeed);
+}
+function updateMotionStatus() {
+  const layers = resolveLayers(project, previewValues);
+  const moving = layers.some(layer => layer.timeScale !== 0 && hasMotion(layer));
+  const frozen = layers.length > 0 && layers.every(layer => layer.timeScale === 0);
+  const frozenMotion = layers.some(layer => layer.timeScale === 0 && hasMotion(layer));
+  const status = !playing ? 'Preview paused' : !layers.length ? 'No visible parts' : moving ? 'Live preview' : frozen || frozenMotion ? 'Layer clocks frozen' : 'No movement configured';
+  if ($('preview-status').textContent !== status) $('preview-status').textContent = status;
+  $('motion-hint').hidden = !playing || !layers.length || moving;
+  const hint = frozen || frozenMotion
+    ? 'Play is running, but movement is frozen. Set the layer’s Time scale to a nonzero value to animate.'
+    : 'Play is running. Add path flow or a movement distance to animate these parts.';
+  if ($('motion-hint-text').textContent !== hint) $('motion-hint-text').textContent = hint;
+}
+function updatePlayback() {
+  $('play-pause').innerHTML = icon(playing ? 'pause' : 'play');
+  $('play-pause').setAttribute('aria-label', playing ? 'Pause animation' : 'Play animation');
+  updateMotionStatus();
+}
 function showShapes() { if (project.layers.length >= 64) { toast('A project can contain up to 64 layers.'); return; } $('shape-dialog').showModal(); }
 
 $('layers').addEventListener('click', event => {
@@ -549,6 +587,12 @@ $('properties-panel').addEventListener('change', event => {
   if (event.target.id === 'fill-volume') { mutate(() => { setLayerFlag(selectedLayer(), 'fill', event.target.checked); }); renderControls(); }
 });
 $('properties-panel').addEventListener('click', event => {
+  const tracker = event.target.closest('#toggle-part-tracker');
+  if (tracker) {
+    trackPart = !trackPart; viewport.setOptions({ trackPart });
+    tracker.setAttribute('aria-pressed', trackPart);
+    tracker.innerHTML = icon('eye') + (trackPart ? 'Tracking part 1' : 'Track a part'); return;
+  }
   if (event.target.closest('#edit-path')) { editPath(); return; }
   if (event.target.closest('#make-surface')) { makeSurface(); return; }
   if (event.target.closest('#convert-path')) { convertPolygon(); return; }
@@ -623,6 +667,17 @@ $('project-name').onchange = () => { const name = $('project-name').value.trim()
 $('part-count').onchange = () => { mutate(() => { project.parts = Number($('part-count').value); }); };
 $('point-size').oninput = () => { mutate(() => { project.pointSize = Number($('point-size').value); }, 'pointSize'); viewport.setOptions({ pointSize: project.pointSize }); };
 $('play-pause').onclick = () => { playing = !playing; updatePlayback(); };
+$('configure-movement').onclick = () => {
+  const layers = resolveLayers(project, previewValues);
+  const layer = layers.find(item => item.timeScale === 0 && hasMotion(item)) || layers.find(item => item.id === selectedId) || layers[0];
+  if (!layer) return;
+  selectedId = layer.id; openSections.set('part-motion', true);
+  if (layer.timeScale === 0) openSections.set('spin', true);
+  renderLayers(); renderProperties(); setTab('properties');
+  const section = $('properties-panel').querySelector(`[data-section="${layer.timeScale === 0 ? 'spin' : 'part-motion'}"]`);
+  section.scrollIntoView({ block: 'nearest' });
+  section.querySelector('summary').focus({ preventScroll: true });
+};
 $('restart').onclick = () => { time = 0; dirty = true; };
 $('preview-time').onchange = () => { const value = Number($('preview-time').value); if ($('preview-time').value !== '' && Number.isFinite(value)) { time = clamp(value, -3600, 3600); playing = false; dirty = true; updatePlayback(); } $('preview-time').value = format(time); };
 for (const [id, amount] of [['frame-back', -1], ['frame-forward', 1]]) $(id).onclick = () => { playing = false; time += amount / 60; dirty = true; updatePlayback(); };
@@ -680,6 +735,7 @@ function frame(now) {
     dirty = false;
   }
   if (now - lastTimeLabel > 60) {
+    updateMotionStatus();
     const absolute = Math.abs(time); $('time-display').textContent = `${time < 0 ? '−' : ''}${Math.floor(absolute / 60).toString().padStart(2, '0')}:${(absolute % 60).toFixed(2).padStart(5, '0')}`;
     $('timeline-progress').style.width = `${((time % 10 + 10) % 10) * 10}%`; lastTimeLabel = now;
     if (document.activeElement !== $('preview-time')) $('preview-time').value = format(time);

@@ -53,8 +53,10 @@ export function exportLua(input) {
 -- Save as GravityShapes/<your shape name>.lua and restart Project Gravity.
 -- Preview colors and point size do not recolor or resize held parts.
 -- Each held part occupies a sample of the visible layers, by part weight.
--- Transform order: primitive, Y twist, radial taper, scatter, Y wave,
--- scale/pulse, X/Y/Z spin, tilted orbit, world-Y bob, then layer position.
+-- Flow follows local centerline distance; open outlines bounce at their ends.
+-- Moving tubes interpolate bounded corner offsets and may narrow at turns.
+-- Transform order: primitive/flow, Y twist, radial taper, scatter, Y wave,
+-- individual displacement, scale/pulse, X/Y/Z spin, orbit, bob, then position.
 -- Layer time is formation time * timeScale + timeOffset (seconds).
 local M = {}
 local NAME = ${luaString('Shape Builder: ' + project.name)}
@@ -68,6 +70,15 @@ local SCATTER_X, SCATTER_Y, SCATTER_Z = 1.4142135623730951, 1.7320508075688772, 
 local function clamp(value, lo, hi) return math.min(hi, math.max(lo, value)) end
 local function finite(value) return type(value) == "number" and value == value and value > -math.huge and value < math.huge end
 local function fract(value) return value - math.floor(value) end
+local function flow_fraction(base, speed, time, length, closed)
+    if speed == 0 or length <= 1e-9 then return base end
+    local cycle = closed and 1 or 2
+    local period = cycle * length / math.abs(speed)
+    local offset = finite(period) and math.fmod(time, period) * speed / length or time * speed / length
+    local value = base + offset
+    local wrapped = value - math.floor(value / cycle) * cycle
+    return closed and wrapped or 1 - math.abs(1 - wrapped)
+end
 local function torus_angle(fraction, eccentricity)
     local target = TAU * fraction
     local angle, low, high = target, 0, TAU
@@ -158,6 +169,61 @@ local function sample_path(geometry, fraction, tube, angle, radial)
     return x, y, z
 end
 
+-- Shared vertex offset frames keep active flow continuous through corners
+-- and the closed seam. Linear interpolation stays bounded without singular
+-- normalization at reversals; stationary geometry keeps its legacy frames.
+local function flow_frames(geometry)
+    if geometry.flow_frames then return geometry.flow_frames end
+    local segments = {}
+    for i = 2, #geometry.points do
+        local p, q = geometry.points[i - 1], geometry.points[i]
+        local dx, dy, dz = q[1] - p[1], q[2] - p[2], q[3] - p[3]
+        local length = math.sqrt(dx * dx + dy * dy + dz * dz)
+        local tx, ty, tz = dx / length, dy / length, dz / length
+        local ax, ay, az = math.abs(dx), math.abs(dy), math.abs(dz)
+        local nx, ny, nz
+        if az <= ax and az <= ay then nx, ny, nz = ty, -tx, 0
+        elseif ay <= ax then nx, ny, nz = -tz, 0, tx
+        else nx, ny, nz = 0, tz, -ty end
+        local normal = math.sqrt(nx * nx + ny * ny + nz * nz)
+        nx, ny, nz = nx / normal, ny / normal, nz / normal
+        segments[#segments + 1] = {nx, ny, nz, ty * nz - tz * ny, tz * nx - tx * nz, tx * ny - ty * nx}
+    end
+    local function average(a, b)
+        local result = {}
+        for axis = 1, 6 do result[axis] = (a[axis] + b[axis]) / 2 end
+        return result
+    end
+    local first = geometry.closed and average(segments[#segments], segments[1]) or segments[1]
+    local frames = {first}
+    for i = 2, #segments do frames[#frames + 1] = average(segments[i - 1], segments[i]) end
+    frames[#frames + 1] = geometry.closed and first or segments[#segments]
+    geometry.flow_frames = frames
+    return frames
+end
+
+local function sample_flow_path(geometry, fraction, tube, angle, radial)
+    local points = geometry.points
+    if #points == 1 or geometry.total <= 1e-9 then return points[1][1], points[1][2], points[1][3] end
+    local target = clamp(fraction, 0, 1) * geometry.total
+    local low, high = 2, #points
+    while low < high do
+        local middle = math.floor((low + high) / 2)
+        if geometry.lengths[middle] < target then low = middle + 1 else high = middle end
+    end
+    local p, q = points[low - 1], points[low]
+    local length = geometry.lengths[low] - geometry.lengths[low - 1]
+    local t = length > 0 and (target - geometry.lengths[low - 1]) / length or 0
+    local position = {p[1] + (q[1] - p[1]) * t, p[2] + (q[2] - p[2]) * t, p[3] + (q[3] - p[3]) * t}
+    if tube > 0 then
+        local frames = flow_frames(geometry)
+        local a, b = frames[low - 1], frames[low]
+        local c, s = tube * radial * math.cos(angle), tube * radial * math.sin(angle)
+        for axis = 1, 3 do position[axis] = position[axis] + (a[axis] * (1 - t) + b[axis] * t) * c + (a[axis + 3] * (1 - t) + b[axis + 3] * t) * s end
+    end
+    return position[1], position[2], position[3]
+end
+
 local function state(x6)
     x6.pre = x6.pre or {}
     local st = x6.pre[NAME]
@@ -220,6 +286,7 @@ function M.px(t, c, x6, x9, x1)
                 layer.timeOffset = layer.timeOffset + animation.offset
             end
             local layer_time = st.time * layer.timeScale + layer.timeOffset
+            layer.motion_time = layer_time
             local rx = (layer.rotation.x + layer_time * layer.spinX) * RAD
             local ry = (layer.rotation.y + layer_time * layer.spin) * RAD
             local rz = (layer.rotation.z + layer_time * layer.spinZ) * RAD
@@ -256,7 +323,9 @@ local function sample(layer, index, count)
         x, y, z = math.cos(b + phase) * horizontal * r, sy * r, math.sin(b + phase) * horizontal * r
     elseif layer.type == "ring" then
         local r = layer.radius * (layer.fill and math.sqrt(v) or 1)
-        x, z = math.cos(a) * r, math.sin(a) * r
+        local along = layer.flowSpeed == 0 and u or flow_fraction(u, layer.flowSpeed, layer.motion_time, layer.radius * layer.arc * RAD, layer.arc == 360)
+        local angle = layer.flowSpeed == 0 and a or layer.arc * RAD * along + phase
+        x, z = math.cos(angle) * r, math.sin(angle) * r
     elseif layer.type == "torus" then
         local r = layer.tube * (layer.fill and math.sqrt(w) or 1)
         local angle = layer.radius > 0 and layer.radius >= layer.tube and torus_angle(v, r / layer.radius) or b
@@ -299,11 +368,14 @@ local function sample(layer, index, count)
         local r = layer.radius * remaining * (layer.fill and math.sqrt(w) or 1)
         x, y, z = math.cos(b + phase) * r, (height - 0.5) * layer.height, math.sin(b + phase) * r
     elseif layer.type == "line" then
-        x = (u - 0.5) * layer.width
+        local along = layer.flowSpeed == 0 and u or flow_fraction(u, layer.flowSpeed, layer.motion_time, layer.width, false)
+        x = (along - 0.5) * layer.width
         local r = layer.tube * (layer.fill and math.sqrt(w) or 1)
         y, z = math.cos(b) * r, math.sin(b) * r
     elseif layer.type == "polygon" then
-        local along = index / math.max(1, count) * layer.sides
+        local fraction = index / math.max(1, count)
+        local perimeter = 2 * layer.sides * layer.radius * math.sin(math.pi / layer.sides)
+        local along = (layer.flowSpeed == 0 and fraction or flow_fraction(fraction, layer.flowSpeed, layer.motion_time, perimeter, true)) * layer.sides
         local edge = math.floor(along)
         local t = along - edge
         local first = TAU * edge / layer.sides + phase + math.pi / 2
@@ -315,13 +387,20 @@ local function sample(layer, index, count)
             x, y = x * r, y * r
         elseif layer.tube > 0 then
             local normal = first + math.pi / layer.sides
-            x = x + math.cos(normal) * layer.tube * math.cos(b)
-            y = y + math.sin(normal) * layer.tube * math.cos(b)
+            local nx = layer.flowSpeed == 0 and math.cos(normal) or math.cos(math.pi / layer.sides) * (math.cos(first) * (1 - t) + math.cos(second) * t)
+            local ny = layer.flowSpeed == 0 and math.sin(normal) or math.cos(math.pi / layer.sides) * (math.sin(first) * (1 - t) + math.sin(second) * t)
+            x = x + nx * layer.tube * math.cos(b)
+            y = y + ny * layer.tube * math.cos(b)
             z = layer.tube * math.sin(b)
         end
     elseif layer.type == "path" then
         local fraction = layer.geometry.closed and index / math.max(1, count) or (count > 1 and index / (count - 1) or 0.5)
-        x, y, z = sample_path(layer.geometry, fraction, layer.tube, b, layer.fill and math.sqrt(w) or 1)
+        if layer.flowSpeed == 0 then
+            x, y, z = sample_path(layer.geometry, fraction, layer.tube, b, layer.fill and math.sqrt(w) or 1)
+        else
+            fraction = flow_fraction(fraction, layer.flowSpeed, layer.motion_time, layer.geometry.total, layer.geometry.closed)
+            x, y, z = sample_flow_path(layer.geometry, fraction, layer.tube, b, layer.fill and math.sqrt(w) or 1)
+        end
     elseif layer.type == "pointcloud" then
         local points = layer.geometry.points
         local point = points[math.min(#points, math.floor(u * #points) + 1)]
@@ -335,6 +414,12 @@ local function sample(layer, index, count)
     y = y + layer.scatter * (2 * fract((index + 0.5) * SCATTER_Y) - 1)
     z = z + layer.scatter * (2 * fract((index + 0.5) * SCATTER_Z) - 1)
     y = y + layer.wave * math.sin(TAU * u * layer.waveCount + layer.wave_phase)
+    if layer.partMoveX ~= 0 or layer.partMoveY ~= 0 or layer.partMoveZ ~= 0 then
+        local theta = TAU * (layer.motion_time * layer.partMoveSpeed + u * layer.partMoveSpread) + layer.partMovePhase * RAD
+        x = x + layer.partMoveX * math.sin(theta)
+        y = y + layer.partMoveY * math.sin(theta + layer.partMovePhaseY * RAD)
+        z = z + layer.partMoveZ * math.sin(theta + layer.partMovePhaseZ * RAD)
+    end
     x, y, z = x * layer.scale.x * layer.pulse_scale, y * layer.scale.y * layer.pulse_scale, z * layer.scale.z * layer.pulse_scale
     y, z = y * layer.cx - z * layer.sx, y * layer.sx + z * layer.cx
     x, z = x * layer.cy + z * layer.sy, -x * layer.sy + z * layer.cy

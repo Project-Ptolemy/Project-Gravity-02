@@ -21,7 +21,7 @@ export class Viewport {
     this.points = [];
     this.selected = null;
     this.anchor = null;
-    this.options = { grid: true, axes: true, pointSize: 3.4, core: true, coreRadius: 2.5, move: true, snap: 0 };
+    this.options = { grid: true, axes: true, pointSize: 3.4, core: true, coreRadius: 2.5, move: true, snap: 0, trackPart: false };
     this.target = { x: 0, y: 20, z: 0 };
     this.yaw = 0.66;
     this.pitch = 0.43;
@@ -172,13 +172,21 @@ export class Viewport {
     const projected = [];
     const selectedPoints = [];
     const hasSelection = this.selected !== null && this.selected !== undefined;
+    // Sample order identifies the debris slot. Choose before projection and
+    // depth sorting so a hidden or receding part cannot switch the marker to
+    // another sample as the formation moves.
+    const trackedIndex = this.options.trackPart
+      ? this.points.findIndex(point => !hasSelection || point?.layerId === this.selected) : -1;
+    let tracked = null;
     for (let index = 0; index < this.points.length; index++) {
       const point = this.points[index];
       if (!this._validPoint(point)) continue;
       if (hasSelection && point.layerId === this.selected) selectedPoints.push(point);
       const screen = this._project(point);
       if (!screen || screen.x < -20 || screen.x > width + 20 || screen.y < -20 || screen.y > height + 20) continue;
-      projected.push({ ...screen, point, index });
+      const item = { ...screen, point, index };
+      projected.push(item);
+      if (index === trackedIndex) tracked = item;
     }
     projected.sort((a, b) => b.depth - a.depth || a.index - b.index);
     this._projected = projected;
@@ -219,6 +227,7 @@ export class Viewport {
     }
     ctx.globalAlpha = 1;
     if (core) this._drawCoreLabel(core);
+    if (tracked) this._drawTrackedPart(tracked);
     this._gizmoHandles = [];
     this._gizmoCenter = null;
     if (this.options.move && hasSelection && this.anchor) this._drawGizmo();
@@ -387,6 +396,41 @@ export class Viewport {
     ctx.fillStyle = '#dca1c0';
     ctx.fillText(label, x, y);
     ctx.textBaseline = 'alphabetic';
+  }
+
+  /** A preview overlay only: it never enters pick targets or sampled geometry. */
+  _drawTrackedPart(item) {
+    if (item.depth < NEAR_CLIP || item.x < 0 || item.x > this.width || item.y < 0 || item.y > this.height) return;
+    const ctx = this.ctx;
+    const radius = Math.max(7, this._pointSize(item) / 2 + 5);
+    ctx.save();
+    ctx.globalAlpha = 1;
+    ctx.setLineDash([]);
+    ctx.beginPath();
+    ctx.arc(item.x, item.y, radius, 0, TAU);
+    ctx.strokeStyle = '#10160d';
+    ctx.lineWidth = 5;
+    ctx.stroke();
+    ctx.strokeStyle = '#ffdb8a';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+
+    const label = 'PART 1';
+    ctx.font = '600 9px ui-monospace, monospace';
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'middle';
+    const width = ctx.measureText(label).width;
+    if (this.width >= width + 16 && this.height >= 24) {
+      let x = item.x + radius + 10;
+      if (x + width + 6 > this.width) x = item.x - radius - 10 - width;
+      x = clamp(x, 8, this.width - width - 8);
+      const y = clamp(item.y, 12, this.height - 12);
+      ctx.fillStyle = 'rgba(11, 17, 8, 0.94)';
+      ctx.fillRect(x - 5, y - 9, width + 10, 18);
+      ctx.fillStyle = '#ffdb8a';
+      ctx.fillText(label, x, y);
+    }
+    ctx.restore();
   }
 
   _drawCoreGuide() {

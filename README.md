@@ -113,6 +113,13 @@ or revolve your drawn profiles, and repeat layers in lines or radial arrangement
 Add transforms, motion and in-game controls, then save an
 editable JSON project or export a Lua module for Project Gravity.
 
+Under **Part movement**, send pieces along paths, polygons, rings and lines, or
+give every layer individual XYZ motion with stagger and axis phases. **Track a
+part** highlights one piece in the preview so circulation is easy to see. New
+custom geometry starts without motion: if the clock advances but the pieces
+stay still, use **Configure movement** and set a nonzero flow speed or movement
+distance/frequency. The layer's **Time scale** must also be nonzero.
+
 New scenes default to **128 debris parts**. Existing projects keep their saved
 count; change it under **Preview settings → Debris count**.
 
@@ -143,7 +150,7 @@ your executor's `GravityShapes` folder, then restart Project Gravity and select 
 filename in the shape list. The preview is a geometry editor; Roblox's live
 physics, network ownership and available debris affect the in-game result.
 
-The optional browser smoke suite runs the editor in headless Chromium. Install
+The optional browser suites run the editor in headless Chromium. Install
 Playwright in a separate tools directory, then point the suite at that package:
 
 ```powershell
@@ -151,9 +158,11 @@ npm install --prefix "$env:TEMP/gravity-browser-tools" playwright
 & "$env:TEMP/gravity-browser-tools/node_modules/.bin/playwright.cmd" install chromium
 $env:PLAYWRIGHT_MODULE = "$env:TEMP/gravity-browser-tools/node_modules/playwright"
 node tests/builder_browser.cjs
+node tests/builder_tracking_browser.cjs
+node tests/builder_playback_browser.cjs
 ```
 
-The suite serves the site automatically. Set `PLAYWRIGHT_CHROMIUM_EXECUTABLE` to
+These suites serve the site automatically. Set `PLAYWRIGHT_CHROMIUM_EXECUTABLE` to
 use an existing Chromium executable, or `BUILDER_SCREENSHOT_DIR` to save desktop
 and mobile review images.
 

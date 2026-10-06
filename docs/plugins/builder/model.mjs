@@ -1,8 +1,10 @@
 import { compilePath, samplePath, MAX_PATH_POINTS, PATH_COORDINATE_LIMIT } from './geometry/path.mjs';
+import { flowFraction, sampleFlowPath } from './geometry/flow.mjs';
 
 // The editor and exported plugin share this point-sampling contract. All units
 // are Roblox studs, degrees, and seconds of the engine's formation clock.
 export const LAYER_TYPES = Object.freeze(['sphere', 'ring', 'torus', 'helix', 'box', 'grid', 'cone', 'cylinder', 'line', 'spiral', 'polygon', 'path', 'pointcloud']);
+export const FLOW_LAYER_TYPES = Object.freeze(['path', 'polygon', 'ring', 'line']);
 export const DEFAULT_PART_COUNT = 128;
 const def = (label, min, max, step, value) => Object.freeze({ label, min, max, step, default: value });
 export const PROPERTY_DEFS = Object.freeze({
@@ -24,6 +26,15 @@ export const PROPERTY_DEFS = Object.freeze({
   waveSpeed: def('Wave frequency (Hz)', 0, 10, 0.05, 1),
   waveCount: def('Wave cycles along path', 0, 20, 0.1, 1),
   wavePhase: def('Wave phase', -360, 360, 1, 0),
+  flowSpeed: def('Path flow (local studs/s)', -500, 500, 0.1, 0),
+  partMoveX: def('Part motion X', 0, 200, 0.1, 0),
+  partMoveY: def('Part motion Y', 0, 200, 0.1, 0),
+  partMoveZ: def('Part motion Z', 0, 200, 0.1, 0),
+  partMoveSpeed: def('Part motion frequency (Hz)', -10, 10, 0.05, 1),
+  partMoveSpread: def('Part motion phase spread', 0, 20, 0.1, 1),
+  partMovePhase: def('Part motion phase', -360, 360, 1, 0),
+  partMovePhaseY: def('Part motion Y phase', -360, 360, 1, 90),
+  partMovePhaseZ: def('Part motion Z phase', -360, 360, 1, 0),
   orbitRadius: def('Orbit radius', 0, 500, 0.1, 0),
   orbitAspect: def('Orbit Z aspect', 0.01, 5, 0.01, 1),
   orbitSpeed: def('Orbit speed (deg/s)', -360, 360, 1, 15),
@@ -339,7 +350,8 @@ function torusAngle(fraction, eccentricity) {
 
 // index is zero-based within its layer; count is that layer's actual share.
 // Order: primitive -> local-Y twist -> radial taper -> local scatter -> Y wave
-// -> scale/pulse -> X/Y/Z rotation/spin -> tilted orbit -> world-Y bob -> position.
+// -> individual local displacement -> scale/pulse -> X/Y/Z rotation/spin
+// -> tilted orbit -> world-Y bob -> position. Flow changes only path position.
 // The layer clock (time*timeScale+timeOffset) drives every temporal modifier.
 export function sampleLayer(layer, index, count, time = 0, pathTable = null) {
   time = time * layer.timeScale + layer.timeOffset;
@@ -353,7 +365,9 @@ export function sampleLayer(layer, index, count, time = 0, pathTable = null) {
     x = Math.cos(b + phase) * horizontal * r; y = sy * r; z = Math.sin(b + phase) * horizontal * r;
   } else if (layer.type === 'ring') {
     const r = layer.radius * (layer.fill ? Math.sqrt(v) : 1);
-    x = Math.cos(a) * r; z = Math.sin(a) * r;
+    const along = layer.flowSpeed === 0 ? u : flowFraction(u, layer.flowSpeed, time, layer.radius * layer.arc * RAD, layer.arc === 360);
+    const angle = layer.flowSpeed === 0 ? a : layer.arc * RAD * along + phase;
+    x = Math.cos(angle) * r; z = Math.sin(angle) * r;
   } else if (layer.type === 'torus') {
     const r = layer.tube * (layer.fill ? Math.sqrt(w) : 1);
     const angle = layer.radius > 0 && layer.radius >= layer.tube ? torusAngle(v, r / layer.radius) : b;
@@ -389,11 +403,14 @@ export function sampleLayer(layer, index, count, time = 0, pathTable = null) {
     const r = layer.radius * remaining * (layer.fill ? Math.sqrt(w) : 1);
     x = Math.cos(b + phase) * r; y = (height - 0.5) * layer.height; z = Math.sin(b + phase) * r;
   } else if (layer.type === 'line') {
-    x = (u - 0.5) * layer.width;
+    const along = layer.flowSpeed === 0 ? u : flowFraction(u, layer.flowSpeed, time, layer.width, false);
+    x = (along - 0.5) * layer.width;
     const r = layer.tube * (layer.fill ? Math.sqrt(w) : 1);
     y = Math.cos(b) * r; z = Math.sin(b) * r;
   } else if (layer.type === 'polygon') {
-    const along = index / Math.max(1, count) * layer.sides;
+    const fraction = index / Math.max(1, count);
+    const perimeter = 2 * layer.sides * layer.radius * Math.sin(Math.PI / layer.sides);
+    const along = (layer.flowSpeed === 0 ? fraction : flowFraction(fraction, layer.flowSpeed, time, perimeter, true)) * layer.sides;
     const edge = Math.floor(along), t = along - edge;
     const first = TAU * edge / layer.sides + phase + Math.PI / 2;
     const second = first + TAU / layer.sides;
@@ -401,14 +418,20 @@ export function sampleLayer(layer, index, count, time = 0, pathTable = null) {
     y = (Math.sin(first) * (1 - t) + Math.sin(second) * t) * layer.radius;
     if (layer.fill) { const r = Math.sqrt(v); x *= r; y *= r; }
     else if (layer.tube > 0) {
+      // Shared averaged corner normals interpolate continuously during flow.
       const normal = first + Math.PI / layer.sides;
-      x += Math.cos(normal) * layer.tube * Math.cos(b);
-      y += Math.sin(normal) * layer.tube * Math.cos(b);
+      const nx = layer.flowSpeed === 0 ? Math.cos(normal) : Math.cos(Math.PI / layer.sides) * (Math.cos(first) * (1 - t) + Math.cos(second) * t);
+      const ny = layer.flowSpeed === 0 ? Math.sin(normal) : Math.cos(Math.PI / layer.sides) * (Math.sin(first) * (1 - t) + Math.sin(second) * t);
+      x += nx * layer.tube * Math.cos(b);
+      y += ny * layer.tube * Math.cos(b);
       z = layer.tube * Math.sin(b);
     }
   } else if (layer.type === 'path') {
     const fraction = layer.path.closed ? index / Math.max(1, count) : count > 1 ? index / (count - 1) : 0.5;
-    ({ x, y, z } = samplePath(pathTable || compilePath(layer.path), fraction, layer.tube, b, layer.fill ? Math.sqrt(w) : 1));
+    const table = pathTable || compilePath(layer.path);
+    ({ x, y, z } = layer.flowSpeed === 0
+      ? samplePath(table, fraction, layer.tube, b, layer.fill ? Math.sqrt(w) : 1)
+      : sampleFlowPath(table, flowFraction(fraction, layer.flowSpeed, time, table.total, layer.path.closed), layer.path.closed, layer.tube, b, layer.fill ? Math.sqrt(w) : 1));
   } else if (layer.type === 'pointcloud') {
     const point = layer.path.points[Math.min(layer.path.points.length - 1, Math.floor(u * layer.path.points.length))];
     ({ x, y, z } = point);
@@ -421,6 +444,12 @@ export function sampleLayer(layer, index, count, time = 0, pathTable = null) {
   y += layer.scatter * (2 * fract((index + 0.5) * SCATTER_Y) - 1);
   z += layer.scatter * (2 * fract((index + 0.5) * SCATTER_Z) - 1);
   y += layer.wave * Math.sin(TAU * u * layer.waveCount + time * layer.waveSpeed * TAU + phase + layer.wavePhase * RAD);
+  if (layer.partMoveX || layer.partMoveY || layer.partMoveZ) {
+    const theta = TAU * (time * layer.partMoveSpeed + u * layer.partMoveSpread) + layer.partMovePhase * RAD;
+    x += layer.partMoveX * Math.sin(theta);
+    y += layer.partMoveY * Math.sin(theta + layer.partMovePhaseY * RAD);
+    z += layer.partMoveZ * Math.sin(theta + layer.partMovePhaseZ * RAD);
+  }
   const pulse = 1 + layer.pulse / 100 * Math.sin(time * layer.pulseSpeed * TAU + phase + layer.pulsePhase * RAD);
   x *= layer.scale.x * pulse; y *= layer.scale.y * pulse; z *= layer.scale.z * pulse;
   const rx = (layer.rotation.x + time * layer.spinX) * RAD;

@@ -74,11 +74,55 @@ Formula parameters `u` and `v` range from 0 to 1; angles use radians. For exampl
 curve. For a surface, use `Z = 40 * (v - 0.5)`. A curve or surface can contain up
 to 4,096 sampled points, and each expression accepts up to 500 characters.
 
+## Animate your formation
+
 Preview the result as debris, then adjust each layer's spin, orbit, bob, pulse,
-waves, twist, taper and scatter. Bind numeric properties to sliders, add
+waves, twist, taper and scatter. **Part movement** adds flow along an outline and
+independent XYZ movement for its pieces. Bind numeric properties to sliders, add
 visibility or fill switches, or use action buttons to restart, reverse and reset
 a layer. Controls work in the preview and exported plugin. Undo and redo work
 across project edits.
+
+Drawing, importing or generating geometry does not enable motion automatically.
+If the clock advances while a custom path or surface stays still, select its
+layer and open **Part movement**, or choose **Configure movement** when the
+preview says **No movement configured**. Set **Path flow speed** above zero on
+an outline, or set an **X**, **Y** or **Z distance** above zero with a nonzero
+**Movement frequency**. Spin, bob and the other motion sections are also
+available. Under **Spin & timing**, keep **Time scale** nonzero; zero freezes
+that layer, and **Layer clocks frozen** means the layers with configured motion
+have stopped clocks. Press **Play** to advance the preview clock.
+
+**Path flow speed** is available on custom paths, polygons, rings and lines.
+Closed paths, polygons and full rings circulate continuously. Open paths,
+lines and partial rings travel back and forth at their ends. Negative speed
+reverses the flow. Speed measures distance along the local centerline in studs
+per second, before deformation and layer scaling; tube offsets and transforms
+can change a piece's speed in world space. Smooth paths follow their sampled
+curve. Flowing tubes stay continuous at corners, but their cross-sections can
+narrow at sharp bends or reversals.
+
+Every layer type, including generated surfaces and imported point clouds,
+supports local XYZ oscillation. Each **distance** is the center-to-peak
+displacement along that local axis. **Movement frequency** sets cycles per
+second; zero holds the offsets still. **Stagger across parts** spreads the
+motion over the pieces: 0 moves them together, and 1 spreads one complete cycle
+across the layer. Expand **Axis phases** to set the starting phase and separate
+Y/Z phase offsets. For example, equal X/Y distances with a 90° Y phase offset
+make each piece orbit its own position. These offsets follow the layer's scale,
+pulse and rotation, and can combine with path flow or whole-layer motion.
+
+Flow and XYZ motion use the same layer clock as spin, orbit, bob, pulse and
+waves. **Time scale**, **Time offset** and restart/reverse/reset control actions
+therefore affect them together. Their numeric settings can be bound to sliders,
+saved in project JSON and exported to Lua.
+
+Use **Track a part** to show an amber marker on one sampled piece in the selected
+layer. It makes circulation visible when an evenly filled outline appears
+unchanged. The tracker is a preview overlay; its marker is omitted from saved
+geometry and exported Lua.
+
+## Save and export
 
 Save a JSON project to keep an editable, portable copy. Browser autosave is local
 to the browser and site origin and depends on available storage. Large projects
@@ -126,9 +170,10 @@ The hosted URLs use the same paths as the local server. See the
 | `app.mjs` | Project state, layers, property controls, undo/redo and saving |
 | `project-file.mjs` | Portable JSON serialization and project file size validation |
 | `model.mjs` | Project validation and formation sampling |
-| `viewport.mjs` | Canvas 3D preview, camera and scene interaction |
+| `viewport.mjs` | Canvas 3D preview, camera, scene interaction and part tracking overlay |
 | `exporter.mjs` | Standalone Project Gravity Lua generation |
 | `geometry/path.mjs` | Custom path geometry and sampling |
+| `geometry/flow.mjs` | Centerline flow, open/closed travel and continuous tube sampling |
 | `geometry/formula.mjs` | Math expression parsing and curve/surface sampling |
 | `geometry/vertices.mjs` | Precise, bounded selection transforms and flattening |
 | `geometry/surface.mjs` | Extruded and revolved path surfaces |
@@ -144,7 +189,7 @@ hosting the builder. Tests remain in the repository's `tests/` folder; see the
 [repository README](../../../README.md#web-formation-builder) for the optional
 Playwright setup. Playwright is a development test tool, not an editor dependency.
 
-Run the model and import checks from the repository root:
+Run the geometry, model and control checks from the repository root:
 
 ```powershell
 node tests/builder_model.test.mjs
@@ -154,6 +199,7 @@ node tests/builder_controls.test.mjs
 node tests/builder_vertices.test.mjs
 node tests/builder_surface.test.mjs
 node tests/builder_arrangement.test.mjs
+node tests/builder_motion.test.mjs
 ```
 
 With the optional Playwright setup, run the browser checks:
@@ -168,13 +214,16 @@ node tests/builder_vertices_browser.cjs
 node tests/builder_surface_browser.cjs
 node tests/builder_arrangement_browser.cjs
 node tests/builder_customization_browser.cjs
+node tests/builder_tracking_browser.cjs
+node tests/builder_playback_browser.cjs
 ```
 
 These cover desktop/mobile navigation, drawing and imports, selection transforms,
-surfaces and repeated layers, controls, exports, and reopening large projects even
-when browser autosave reaches its quota. The customization suite exercises the
-combined vertex → surface → repeated-layer workflow through undo and reopening.
+surfaces and repeated layers, controls, exports, part tracking and playback, and
+reopening large projects even when browser autosave reaches its quota. The
+customization suite exercises the combined vertex → surface → repeated-layer
+workflow through undo and reopening.
 
-The model and controls suites also compare generated Lua against browser behavior when
-Lua, LuaJIT or Luau is available; set `LUAU` or `LUAJIT` to its executable path if
-it is not on `PATH`.
+The model, controls and motion suites also compare generated Lua against browser
+behavior when Lua, LuaJIT or Luau is available; set `LUAU` or `LUAJIT` to its
+executable path if it is not on `PATH`.
