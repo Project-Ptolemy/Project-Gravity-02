@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="Build Project Gravity shape plugins. Module reference, real action buttons, mobile steering, cleanup, and a ready-to-copy AI prompt.">
+  <meta name="description" content="Create Project Gravity plugins with the module API, installation guide, controls, mobile input, and a ready-to-copy AI prompt.">
   <title>Shape plugins · Project Gravity</title>
   <link rel="stylesheet" href="style.css">
   <script src="guide.js" defer></script>
@@ -11,24 +11,31 @@
 <body>
   <a class="skip" href="#content">Skip to content</a>
   <header class="topbar">
-    <a class="brand" href="https://github.com/Project-Ptolemy/Project-Gravity-02">PROJECT GRAVITY <span class="divider">/</span> <span class="muted">DEVELOPERS</span></a>
-    <a class="top-link" href="#prompt">Get the AI prompt <span aria-hidden="true">↗</span></a>
+    <a class="brand" href="../../" aria-label="Project Gravity home">PROJECT GRAVITY <span class="divider">/</span> <span class="muted">DEVELOPERS</span></a>
+    <nav aria-label="Main navigation"><a class="top-link" href="../../">Home</a><a class="top-link" href="builder/">Shape builder <span aria-hidden="true">↗</span></a></nav>
   </header>
   <main id="content">
     <section class="hero" aria-labelledby="page-title">
-      <p class="eyebrow">SHAPE PLUGIN GUIDE <span class="badge">Buttons + mobile input</span></p>
-      <h1 id="page-title">Build the next<br><span>formation.</span></h1>
-      <p class="lead">Turn an idea into moving debris. Write a Luau module, add controls, and make it work on a phone.</p>
-      <div class="actions"><a class="button primary" href="#prompt">Create with your AI <span aria-hidden="true">↗</span></a><a class="button secondary" href="starter.lua" download="Orbit Bloom.lua">Download a starter</a></div>
+      <p class="eyebrow">THE PLUGIN GUIDE <span class="badge">Create. Connect. Customize.</span></p>
+      <h1 id="page-title">Make it work<br><span>your way.</span></h1>
+      <p class="lead">Bring your formation into Project Gravity. Install a plugin, explore the module API, add controls and mobile input, or start with a complete prompt for your AI.</p>
+      <div class="actions"><a class="button primary" href="#start">Install a plugin <span aria-hidden="true">↓</span></a><a class="button secondary" href="#builder">Build a shape by hand</a><a class="button secondary" href="#prompt">Create with your AI</a></div>
       <p class="caption">Already using the in-game assistant? Look for <strong>PROJECT UAI</strong>.</p>
     </section>
     <div class="guide-layout">
       <aside aria-label="On this page">
         <p class="eyebrow">ON THIS PAGE</p>
-        <nav><a href="#start">01 &nbsp; Install a plugin</a><a href="#contract">02 &nbsp; Module contract</a><a href="#controls">03 &nbsp; Controls &amp; buttons</a><a href="#physics">04 &nbsp; Release &amp; impulses</a><a href="#mobile">05 &nbsp; Mobile steering</a><a href="#cleanup">06 &nbsp; Stop &amp; unload</a><a href="#prompt">07 &nbsp; Copy an AI prompt</a></nav>
+        <nav><a href="#builder">Build a shape by hand</a><a href="#start">01 &nbsp; Install a plugin</a><a href="#contract">02 &nbsp; Module contract</a><a href="#controls">03 &nbsp; Controls &amp; buttons</a><a href="#physics">04 &nbsp; Release &amp; impulses</a><a href="#mobile">05 &nbsp; Mobile steering</a><a href="#cleanup">06 &nbsp; Stop &amp; unload</a><a href="#prompt">07 &nbsp; Copy an AI prompt</a></nav>
         <a class="reference" href="https://github.com/Project-Ptolemy/Project-Gravity-02/blob/main/docs/PLUGINS.md">Full reference (.md) ↗</a>
       </aside>
       <div class="chapters">
+        <section id="builder">
+          <p class="eyebrow">WEB SHAPE BUILDER</p><h2>Start with a line. Make it yours.</h2>
+          <p>Sketch an open path, close it into a polygon, or draw a freehand stroke. Move individual vertices, add depth, and combine separate outlines into one formation. Each layer has its own position, rotation, scale and motion.</p>
+          <ol class="steps"><li><strong>Draw or import.</strong> Place points by hand, start with a regular polygon, import an SVG outline or 3D coordinates, or generate a curve or surface from formulas.</li><li><strong>Shape the motion.</strong> Watch the debris preview while you adjust layers, add spin, orbit, waves and other movement, and expose settings as in-game controls.</li><li><strong>Keep and export.</strong> Save an editable JSON project, then download a Lua plugin and install it using the steps below.</li></ol>
+          <div class="actions"><a class="button primary" href="builder/">Build your own shape <span aria-hidden="true">↗</span></a><a class="button secondary" href="starter.lua" download="Orbit Bloom.lua">Download a code starter</a></div>
+          <p class="caption">Projects autosave in this browser. Download JSON to keep a portable copy.</p>
+        </section>
         <section id="start">
           <p class="eyebrow">01 / GET STARTED</p><h2>One file. Your own shape.</h2>
           <ol class="steps"><li>Save a module in your executor's <code>GravityShapes</code> folder as <code>Shape Name.lua</code>.</li><li>Run Project Gravity again and select the shape by its filename.</li><li>Use the shape's controls to adjust its motion. The starter includes a working action button.</li></ol>

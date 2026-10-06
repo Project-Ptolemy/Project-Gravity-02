@@ -1,6 +1,6 @@
 # Shape plugin guide
 
-[Website guide](https://projectgravity.pages.dev/) · [Website source](plugins/index.html) · [Full LLM prompt](plugins/plugin-prompt.txt) · [Starter module](plugins/starter.lua)
+[Website homepage](../index.html) · [Website guide](plugins/index.html) · [Full LLM prompt](plugins/plugin-prompt.txt) · [Starter module](plugins/starter.lua)
 
 Save a module as `GravityShapes/<Shape Name>.lua` in your executor's workspace and run Project Gravity again. Local plugins appear in the shape selector. The **PROJECT UAI** button launches [Project UAI](https://github.com/CarlDV/ProjectUAI) on demand; you can also take the prompt above to another AI.
 
@@ -149,12 +149,33 @@ The black hole motion suite checks a 512-part sphere and integrates the real des
 
 ## Publish the website
 
-The static site lives in `docs/plugins`. With Cloudflare credentials available locally:
+The website entry point is **`/index.html` at the repository root**. The plugin
+guide remains at `/docs/plugins/`, and the builder at `/docs/plugins/builder/`.
+All three are ordinary static pages; the homepage does not redirect to the guide.
+
+Connect the repository to **Cloudflare Pages** using Git integration. Select the
+branch you want to publish and use these build settings:
+
+| Setting | Value |
+| --- | --- |
+| Framework preset | None |
+| Build command | `exit 0` |
+| Build output directory | `.` (the repository root) |
+| Root directory | Leave unset (the repository root) |
+
+There are no packages to install or application build steps. Keep `index.html`,
+`assets/`, and `docs/plugins/` in their current relative locations. Do not set
+`docs/plugins` as the build output directory: that would make the guide the home
+page and break the new navigation. Cloudflare handles deployment when the
+connected branch is pushed; these instructions do not publish the site.
+
+Before pushing, check the documentation and serve the repository root locally:
 
 ```powershell
 python tools/sync_plugin_docs.py --check
 node tests/plugin_docs.test.js
-npx wrangler pages deploy docs/plugins --project-name projectgravity --branch main
+python -m http.server 8000 --bind 127.0.0.1
 ```
 
-Wrangler state and local environment files are ignored by Git. Keep credentials out of the site directory and commits.
+Visit `http://127.0.0.1:8000/`, `/docs/plugins/`, and `/docs/plugins/builder/`.
+After Cloudflare deploys, the selected domain uses those same paths.

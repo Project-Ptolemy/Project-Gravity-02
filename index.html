@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#171a18">
+  <meta name="description" content="Make your own Project Gravity formations. Draw custom 3D paths, animate layers, and export a Lua plugin with the web shape builder.">
+  <title>Project Gravity · Make something move</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 40'%3E%3Crect width='40' height='40' rx='10' fill='%23d4ef9d'/%3E%3Cpath d='M20 6 34 14 20 22 6 14ZM6 21l14 8 14-8M6 28l14 8 14-8' fill='none' stroke='%23222b19' stroke-width='3'/%3E%3C/svg%3E">
+  <link rel="stylesheet" href="assets/home.css">
+</head>
+<body>
+  <a class="skip" href="#content">Skip to content</a>
+  <header class="topbar shell">
+    <a class="brand" href="./" aria-label="Project Gravity home" aria-current="page">
+      <svg viewBox="0 0 30 32" fill="none" aria-hidden="true"><path d="m15 2 12 7-12 7L3 9Z M3 16l12 7 12-7M3 23l12 7 12-7" stroke="currentColor" stroke-width="2.3" stroke-linejoin="round"/></svg>
+      <span>PROJECT GRAVITY<span class="brand-sub">A LITTLE ORDER IN THE CHAOS</span></span>
+    </a>
+    <nav aria-label="Main navigation">
+      <a href="docs/plugins/builder/">Shape builder</a>
+      <a href="docs/plugins/">Plugin guide</a>
+      <a class="github-link" href="https://github.com/Project-Ptolemy/Project-Gravity-02">GitHub <span aria-hidden="true">↗</span></a>
+    </nav>
+  </header>
+  <main id="content" class="shell">
+    <section class="hero" aria-labelledby="page-title">
+      <div class="hero-copy">
+        <p class="eyebrow"><span class="status-dot"></span> YOUR IDEAS. IN MOTION.</p>
+        <h1 id="page-title">Give your ideas<br>a little <em>gravity.</em></h1>
+        <p class="lead">A line becomes a shape. A shape becomes a formation. Draw something of your own, bring it to life, and let the pieces fall into place.</p>
+        <div class="actions">
+          <a class="button primary" href="docs/plugins/builder/">Open shape builder <span aria-hidden="true">↗</span></a>
+          <a class="button secondary" href="docs/plugins/">Explore the plugin guide <span aria-hidden="true">→</span></a>
+        </div>
+        <p class="caption">Create in your browser. Export to Project Gravity in Roblox.</p>
+      </div>
+      <figure class="formation-study">
+        <div class="study-heading"><span><span class="status-dot"></span> A STUDY IN POSSIBILITY</span><span>01 / 3D PATHS</span></div>
+        <svg class="formation-art" viewBox="0 0 600 470" role="img" aria-labelledby="art-title art-description">
+          <title id="art-title">A custom path taking shape in three dimensions</title>
+          <desc id="art-description">Two flowing green and lavender curves with editable vertices cross above a perspective grid.</desc>
+          <defs>
+            <pattern id="dots" width="24" height="24" patternUnits="userSpaceOnUse"><circle cx="1" cy="1" r="1" fill="#343d2d"/></pattern>
+            <radialGradient id="glow"><stop stop-color="#536d343d"/><stop offset="1" stop-color="#171d1400"/></radialGradient>
+            <linearGradient id="ribbon" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#d4ef9d"/><stop offset="1" stop-color="#7da17b"/></linearGradient>
+          </defs>
+          <path fill="url(#dots)" d="M0 0h600v470H0z"/>
+          <ellipse cx="300" cy="225" rx="265" ry="205" fill="url(#glow)"/>
+          <g stroke="#323c2b" fill="none" stroke-width="1">
+            <path d="m34 335 257 116 278-148M79 309l256 121M125 285l255 121M171 261l254 121M217 237l253 121M263 213l252 121M78 356l275-145M126 378l273-144M174 399l271-143M222 421l269-143"/>
+            <path d="M299 80v324m-9-5 9 5 9-5" stroke-dasharray="4 6"/>
+          </g>
+          <path d="M83 283C117 172 213 99 316 135S483 286 448 329 323 286 286 204 400 87 517 190" fill="none" stroke="#a89aca" stroke-width="2" opacity=".65"/>
+          <path d="M75 277C135 376 245 347 294 247S333 89 415 117 542 198 510 257" fill="none" stroke="url(#ribbon)" stroke-width="3"/>
+          <path d="M83 285C143 384 253 355 302 255S341 97 423 125 550 206 518 265" fill="none" stroke="#d4ef9d" stroke-width="1" opacity=".25"/>
+          <g fill="#171d14" stroke="#d4ef9d" stroke-width="2">
+            <circle cx="75" cy="277" r="5"/><circle cx="183" cy="335" r="5"/><circle cx="294" cy="247" r="5"/><circle cx="346" cy="132" r="5"/><circle cx="415" cy="117" r="5"/><circle cx="510" cy="257" r="5"/>
+          </g>
+          <g fill="#d4ef9d">
+            <path d="m99 306 7 2-2 7-7-2zM133 328h7v7h-7zM220 318l6-3 3 6-6 3zM257 290l5-5 5 5-5 5zM313 201l3-7 7 3-3 7zM325 160l3-6 6 3-3 6zM374 111h7v7h-7zM456 134l7 3-3 7-7-3zM491 160l6 5-5 6-6-5zM514 208h7v7h-7z"/>
+          </g>
+          <g fill="#b8a4e6">
+            <path d="m105 226 3-6 6 3-3 6zM143 178l5-4 4 5-5 4zM210 136h6v6h-6zM268 125h7v7h-7zM354 154l6 3-3 6-6-3zM410 210l4 6-6 4-4-6zM448 277h6v6h-6zM407 326h6v6h-6zM342 284l-5-5 5-5 5 5zM288 196h6v6h-6zM342 139h6v6h-6zM420 141h6v6h-6zM477 164l6 3-3 6-6-3z"/>
+          </g>
+          <g font-family="ui-monospace,Consolas,monospace" font-size="10" fill="#a9b59d">
+            <path d="m346 132 20-54h71" fill="none" stroke="#56664a"/>
+            <text x="373" y="68">MAKE IT YOUR OWN</text>
+            <text x="311" y="91" fill="#91ac76">Y</text><text x="553" y="326" fill="#c09281">X</text><text x="51" y="366" fill="#8facce">Z</text>
+          </g>
+          <g transform="translate(299 338)" stroke="#c6dda5" fill="#29351f"><path d="m0-10 10 6v12L0 14l-10-6V-4Z"/><path d="m-10-4 10 6 10-6M0 2v12"/></g>
+        </svg>
+        <figcaption><span><i class="path-dot"></i> Your lines, with another dimension.</span><span class="study-tag">DRAW · SHAPE · MOVE</span></figcaption>
+      </figure>
+    </section>
+    <section class="possibilities" aria-labelledby="possibilities-title">
+      <div class="section-heading"><p class="eyebrow">FROM A FIRST LINE TO A FINISHED FORMATION</p><h2 id="possibilities-title">Room for your own kind of shape.</h2></div>
+      <div class="steps">
+        <article><span class="step-number">01 / CREATE</span><h3>Start with your own lines.</h3><p>Draw paths and freehand strokes. Edit vertices in 3D, import SVG or coordinates, or turn a math formula into a curve or surface.</p></article>
+        <article><span class="step-number">02 / EXPERIMENT</span><h3>Find a little movement.</h3><p>Combine independent layers. Add spin, orbit, waves and more, then watch your formation take shape in the debris preview.</p></article>
+        <article><span class="step-number">03 / TAKE IT WITH YOU</span><h3>From the canvas to the game.</h3><p>Add in-game controls, save an editable JSON project, and export a Lua plugin for your <code>GravityShapes</code> folder.</p></article>
+      </div>
+    </section>
+    <section class="guide-card" aria-labelledby="guide-title"><div><p class="eyebrow">FOR THE CURIOUS &amp; THE CODE-INCLINED</p><h2 id="guide-title">Go a little deeper.</h2><p>Explore the plugin API, installation steps, controls, and a ready-to-copy AI prompt in the dedicated plugin guide.</p></div><a class="button secondary" href="docs/plugins/">Read the plugin guide <span aria-hidden="true">↗</span></a></section>
+  </main>
+  <footer class="footer shell"><span>PROJECT GRAVITY <span class="footer-note">Big ideas. A few little pieces.</span></span><nav aria-label="Footer navigation"><a href="docs/plugins/builder/">Shape builder</a><a href="docs/plugins/">Plugin guide</a><a href="https://github.com/Project-Ptolemy/Project-Gravity-02">GitHub <span aria-hidden="true">↗</span></a></nav></footer>
+</body>
+</html>

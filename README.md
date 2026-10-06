@@ -67,7 +67,7 @@ On touch devices, **Broom**, **Twin Core Beam**, **Goro** and **Raigo** have a c
 steering stick and a separate action button. One finger aims while another acts.
 
 The **[plugin guide](docs/PLUGINS.md)** covers the module API, Buttons, mobile input,
-release physics and cleanup. The **[documentation website](https://projectgravity.pages.dev/)**
+release physics and cleanup. The **[web plugin guide](docs/plugins/index.html)**
 includes **Copy full LLM prompt**; the [plain text prompt](docs/plugins/plugin-prompt.txt)
 can also be pasted into Project UAI or another AI.
 
@@ -101,6 +101,58 @@ complete stacked Rift mouths, even-speed torus links, and continuous surface sea
 The previews show actual module trajectories in a synthetic debris fixture; live
 Roblox physics and network ownership still depend on the game session.
 
+## Web formation builder
+
+Start at the [main homepage](index.html), then open the
+[web shape builder](docs/plugins/builder/) or the separate
+[plugin guide](docs/plugins/). Draw custom paths
+and freehand strokes, edit vertices in 3D, build regular polygons, and combine
+independent layers. Import SVG outlines or 3D coordinates, or generate curves and
+surfaces with formulas. Add transforms, motion and in-game controls, then save an
+editable JSON project or export a Lua module for Project Gravity.
+
+The editor uses vanilla JavaScript, HTML and CSS, with no framework, external
+runtime packages or build step. Projects autosave when browser storage has room;
+download JSON to keep a portable copy. Project imports allow up to 64 MiB, enough
+for the full geometry limits. See the [builder guide and folder map](docs/plugins/builder/README.md)
+for drawing, imports, formulas and practical limits.
+
+From the repository root, serve the entire website without installing any packages:
+
+```powershell
+python -m http.server 8000 --bind 127.0.0.1
+```
+
+Open **http://127.0.0.1:8000/** for the homepage,
+**http://127.0.0.1:8000/docs/plugins/builder/** for the editor, or
+**http://127.0.0.1:8000/docs/plugins/** for the plugin guide.
+
+For Cloudflare Pages connected to this Git repository, choose **None** as the
+framework, **`exit 0`** as the build command, and **`.`** as the build output
+directory. Leave the root directory unset (the repository root). The entry page
+is `/index.html`; the builder and guide retain their `/docs/plugins/` paths.
+See [hosting details](docs/PLUGINS.md#publish-the-website). These settings describe
+how to deploy this layout; they do not indicate that it has been deployed.
+
+Export your formation as `.lua`, save it in
+your executor's `GravityShapes` folder, then restart Project Gravity and select the
+filename in the shape list. The preview is a geometry editor; Roblox's live
+physics, network ownership and available debris affect the in-game result.
+
+The optional browser smoke suite runs the editor in headless Chromium. Install
+Playwright in a separate tools directory, then point the suite at that package:
+
+```powershell
+npm install --prefix "$env:TEMP/gravity-browser-tools" playwright
+& "$env:TEMP/gravity-browser-tools/node_modules/.bin/playwright.cmd" install chromium
+$env:PLAYWRIGHT_MODULE = "$env:TEMP/gravity-browser-tools/node_modules/playwright"
+node tests/builder_browser.cjs
+```
+
+The suite serves the site automatically. Set `PLAYWRIGHT_CHROMIUM_EXECUTABLE` to
+use an existing Chromium executable, or `BUILDER_SCREENSHOT_DIR` to save desktop
+and mobile review images.
+
 ## Usage
 Just run `main.lua` in your executor. It pulls the rest of the files directly from GitHub
 
@@ -132,10 +184,12 @@ projects to use the complete controls.
 - `System.lua`: Runs the physics math and loops
 - `config.lua`: Default settings and shape variables
 - `UI.lua` / `UI_elements.lua`: The UI stuff
+- `index.html`, `assets/home.css`: Main website homepage and responsive styling
 - `RuntimeControls.lua`: Shared settings effects, control refresh and complete reset hooks
 - `shapes/`: The math for how each shape is positioned
 - `shapes-onreview/`: Four experimental modules, labeled separately in the motion gallery
 - `docs/`: Formation guide, plugin website, copyable LLM prompt and motion galleries
+- `docs/plugins/builder/`: Vanilla web shape editor, geometry tools and Lua exporter
 - `tools/`: Reproducible previews and the standalone Luau test runner
 - `/mobilever`: The UI and stuff for mobile users ,ex UI
 
