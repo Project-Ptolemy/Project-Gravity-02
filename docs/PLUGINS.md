@@ -2,7 +2,11 @@
 
 [Website homepage](../index.html) · [Website guide](plugins/index.html) · [Full LLM prompt](plugins/plugin-prompt.txt) · [Starter module](plugins/starter.lua)
 
-Save a module as `GravityShapes/<Shape Name>.lua` in your executor's workspace and run Project Gravity again. Local plugins appear in the shape selector. The **PROJECT UAI** button launches [Project UAI](https://github.com/CarlDV/ProjectUAI) on demand; you can also take the prompt above to another AI.
+In game, open the shape selector, choose **+ Custom shape**, enter a name, and paste the complete Lua module. Click **Check** to validate its syntax and module structure, or **Add & use** to import and select it immediately. This works on desktop and mobile with the web builder's **Copy Lua** export and other compatible shape scripts. Existing names are kept; choose a new name for each import.
+
+The editor saves the script as `GravityShapes/<Shape Name>.lua` when the executor supports local file storage. If saving is unavailable or fails, it reports that the shape is available for this session only. You can also put a module in that folder yourself and run Project Gravity again. Checking a module runs its initialization, just like loading a local plugin; the checks do not simulate its physics.
+
+The **PROJECT UAI** button launches [Project UAI](https://github.com/CarlDV/ProjectUAI) on demand; you can also take the prompt above to another AI.
 
 ## Module contract
 

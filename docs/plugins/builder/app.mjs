@@ -701,7 +701,7 @@ $('project-file').onchange = async () => {
   $('project-file').value = '';
 };
 $('export').onclick = showExport; $('copy-lua').onclick = copyLua;
-$('download-lua').onclick = () => { download($('export-code').value, safeFilename() + '.lua'); toast('Plugin downloaded. Save it in GravityShapes to use it.'); };
+$('download-lua').onclick = () => { download($('export-code').value, safeFilename() + '.lua'); toast('Plugin downloaded. Paste its Lua in game using + Custom shape, or save it in GravityShapes.'); };
 for (const id of ['help', 'keyboard-help']) $(id).onclick = () => $('help-dialog').showModal();
 document.querySelectorAll('[data-close]').forEach(button => { button.onclick = () => button.closest('dialog').close(); });
 document.querySelectorAll('dialog').forEach(dialog => { dialog.addEventListener('click', event => { if (event.target === dialog) { const bounds = dialog.getBoundingClientRect(); if (event.clientX < bounds.left || event.clientX > bounds.right || event.clientY < bounds.top || event.clientY > bounds.bottom) dialog.close(); } }); });

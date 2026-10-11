@@ -2284,10 +2284,52 @@ return function(context)
 		msb.ZIndex = 11
 		Instance.new("UICorner", msb).CornerRadius = UDim.new(0, 6)
 
+		do
+			-- Outside the filtered list so adding a shape is always reachable.
+			local custom = Instance.new("TextButton", dlst_container)
+			custom.Name = "CustomShapeEntry"
+			custom.Position = UDim2.new(0, 10, 0, 63)
+			custom.Size = UDim2.new(1, -20, 0, 44)
+			custom.BackgroundColor3 = Color3.fromRGB(47, 49, 113)
+			custom.TextColor3 = Color3.fromRGB(245, 245, 250)
+			custom.Font = Enum.Font.GothamBold
+			custom.TextSize = 11
+			custom.Text = "+ Custom shape"
+			custom.ZIndex = 12
+			Instance.new("UICorner", custom).CornerRadius = UDim.new(0, 6)
+			local editor, loading
+			custom.Activated:Connect(function()
+				if loading or x6.torn_down then return end
+				if editor and editor.root.Parent then
+					editor.open()
+					toggle_window(dlst_container, false)
+					return
+				end
+				loading = true
+				custom.Text = "Loading..."
+				local ok, result = pcall(function()
+					local builder = load_module("CustomShapeEditor.lua")
+					if type(builder) ~= "function" then error("Could not load the shape editor. Try again.", 0) end
+					if x6.torn_down or not sg.Parent then return nil end
+					return builder(context, sg)
+				end)
+				loading = false
+				if x6.torn_down or not custom.Parent then return end
+				custom.Text = "+ Custom shape"
+				if ok and result then
+					editor = result
+					editor.open()
+					toggle_window(dlst_container, false)
+				elseif not ok and context.x8 and context.x8.notify then
+					context.x8.notify("Custom shape", tostring(result), 5)
+				end
+			end)
+		end
+
 		local dlst = Instance.new("ScrollingFrame", dlst_container)
 		dlst.BackgroundTransparency = 1
-		dlst.Position = UDim2.new(0, 0, 0, 70)
-		dlst.Size = UDim2.new(1, 0, 1, -80)
+		dlst.Position = UDim2.new(0, 0, 0, 115)
+		dlst.Size = UDim2.new(1, 0, 1, -125)
 		dlst.ScrollBarThickness = 0
 		dlst.AutomaticCanvasSize = Enum.AutomaticSize.Y
 		dlst.CanvasSize = UDim2.new(0, 0, 0, 0)
@@ -2399,7 +2441,20 @@ return function(context)
 		end)
 
 		x6.populate_modes = populate_modes
+		x6.mode_filter = function()
+			return msb and msb.Text or ""
+		end
 		populate_modes("")
+
+		-- Custom imports use the same switch path as the selector.
+		function x5.sync_shape(name)
+			if db then
+				db.Text = "  " .. tostring(name):upper()
+			end
+			if dlst_container and dlst_container.Visible then
+				populate_modes(msb.Text)
+			end
+		end
 
 		local tdlst = Instance.new("CanvasGroup", sg)
 		tdlst.Name = "TargetListContainer"

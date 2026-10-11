@@ -50,7 +50,8 @@ export function exportLua(input) {
     return `    { Type = "Slider", Name = ${luaString(name)}, Key = ${luaString(control.id)}, Min = ${Math.round(control.min * divisor)}, Max = ${Math.round(control.max * divisor)}, Div = ${divisor}, Default = ${control.default}, ExactMax = true, Desc = ${luaString(description)} },`;
   }).join('\n');
   return `-- Project Gravity Shape Builder · ${project.name}
--- Save as GravityShapes/<your shape name>.lua and restart Project Gravity.
+-- In game: shape selector > + Custom shape. Name it, paste this script, and Add & use.
+-- Or save as GravityShapes/<your shape name>.lua and restart Project Gravity.
 -- Preview colors and point size do not recolor or resize held parts.
 -- Each held part occupies a sample of the visible layers, by part weight.
 -- Flow follows local centerline distance; open outlines bounce at their ends.

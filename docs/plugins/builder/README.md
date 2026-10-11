@@ -127,8 +127,13 @@ geometry and exported Lua.
 Save a JSON project to keep an editable, portable copy. Browser autosave is local
 to the browser and site origin and depends on available storage. Large projects
 can exceed the browser's quota; the editor will tell you to save JSON instead.
-Export a `.lua` plugin, put it in your executor's
-`GravityShapes` folder, and restart Project Gravity to select it by filename.
+Choose **Export → Copy Lua**, then open the in-game shape selector and choose
+**+ Custom shape**. Name your formation, paste the full Lua script, and click
+**Add & use**. Its controls appear immediately on desktop or mobile. The game
+saves it in `GravityShapes` when your executor supports file storage; otherwise
+the editor reports that it is available for this session only. You can also
+download a `.lua` plugin, put it in `GravityShapes`, and restart Project Gravity
+to select it by filename.
 
 Projects support up to 64 layers, 4,096 vertices per path and 8,192 preview parts.
 New scenes start with **128 debris parts**. Existing projects retain their saved

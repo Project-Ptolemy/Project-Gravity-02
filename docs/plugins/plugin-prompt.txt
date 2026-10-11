@@ -1,7 +1,7 @@
 Create a custom Project Gravity shape plugin in Roblox Luau from the brief at the end. Return one complete .lua module, its filename, and a short controls note. It must work on desktop and mobile with the current runtime. Do not invent APIs or install dependencies.
 
 INSTALLATION
-Save as GravityShapes/<Shape Name>.lua in the executor workspace, then run/re-run Project Gravity. Return a module table, not a standalone loop or another UI.
+In game, open the shape selector, choose + Custom shape, enter a name, paste the full module, and click Add & use. The editor saves to GravityShapes/<Shape Name>.lua when local file storage is available. Alternatively, save the file in that folder and run/re-run Project Gravity. Return a module table, not a standalone loop or another UI.
 
 MODULE CONTRACT
 local M = {}

@@ -13,6 +13,7 @@ Project Gravity is a Roblox script that grabs unanchored parts and moves them ar
   tag or distance
 - Saves your settings automatically
 - Shape plugins support real action buttons and circular mobile steering
+- Add custom shapes in game: paste a Lua shape script, name it, and use it immediately
 - The UI's **X** fully unloads the session, including the core, constraints and keybinds
 
 ### Thirty vast formations
@@ -145,9 +146,17 @@ directory. Leave the root directory unset (the repository root). The entry page
 is `/index.html`; the builder and guide retain their `/docs/plugins/` paths.
 See [hosting details](docs/PLUGINS.md#publish-the-website).
 
-Export your formation as `.lua`, save it in
-your executor's `GravityShapes` folder, then restart Project Gravity and select the
-filename in the shape list. The preview is a geometry editor; Roblox's live
+Use **Export → Copy Lua**, then open Project Gravity's in-game shape selector and
+choose **+ Custom shape**. Enter a name, paste the complete script, and click
+**Add & use**. This works on desktop and mobile, including compatible Lua shape
+scripts from other sources. **Check** validates the Lua syntax and module structure
+before adding it. Existing shape names cannot be overwritten.
+
+Imports appear in the shape list immediately. When your executor supports local
+file storage, the script is saved to `GravityShapes/<name>.lua` for future sessions;
+otherwise the editor reports that it is available for this session only. You can
+also save an exported `.lua` file in `GravityShapes` and restart Project Gravity.
+The preview is a geometry editor; Roblox's live
 physics, network ownership and available debris affect the in-game result.
 
 The optional browser suites run the editor in headless Chromium. Install
@@ -199,6 +208,7 @@ projects to use the complete controls.
 - `UI.lua` / `UI_elements.lua`: The UI stuff
 - `index.html`, `assets/home.css`: Main website homepage and responsive styling
 - `RuntimeControls.lua`: Shared settings effects, control refresh and complete reset hooks
+- `CustomShapes.lua` / `CustomShapeEditor.lua`: In-game Lua shape import, validation and saving
 - `shapes/`: The math for how each shape is positioned
 - `shapes-onreview/`: Four experimental modules, labeled separately in the motion gallery
 - `docs/`: Formation guide, plugin website, copyable LLM prompt and motion galleries
@@ -219,6 +229,8 @@ python tools/test_luau.py --luau PATH_TO_LUAU tests/storm_mothership_motion.lua
 python tools/test_luau.py --luau PATH_TO_LUAU tests/mobile_controls.lua
 python tools/test_luau.py --luau PATH_TO_LUAU tests/session_lifecycle.lua
 python tools/test_luau.py --luau PATH_TO_LUAU tests/uai_integration.lua
+python tools/test_luau.py --luau PATH_TO_LUAU tests/custom_shapes.lua
+python tools/test_luau.py --luau PATH_TO_LUAU tests/custom_shape_editor.lua
 python tools/test_luau.py --luau PATH_TO_LUAU tests/insane_shapes_smoke.lua
 python tools/test_luau.py --luau PATH_TO_LUAU tests/math_curves_smoke.lua
 python tools/test_luau.py --luau PATH_TO_LUAU tests/formation_smoke.lua
@@ -228,6 +240,9 @@ python tools/sync_plugin_docs.py --check
 
 These cover geometry, control limits, mixed part sizes, timing, continuously moving
 frozen poses, late claims, cleanup, topology and desktop/mobile runtime behavior.
+
+To check web exports through the in-game importer, set `LUAU` or `LUAJIT` to your
+runtime's path and run `node tests/builder_custom_import.test.mjs`.
 
 The [gallery index](docs/motion/index.md) records the historical demonstration
 settings and explains the scripted inputs.

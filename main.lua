@@ -793,6 +793,10 @@ local success, err = pcall(function()
 	if not controls_builder then error("Failed to load RuntimeControls") end
 	if x6.torn_down then return end
 	context.controls = controls_builder(context)
+	local custom_shapes = load_module("CustomShapes.lua")
+	if not custom_shapes then error("Failed to load CustomShapes") end
+	if x6.torn_down then return end
+	context.custom_shapes = custom_shapes.create(context)
 
 	x4.f3()
 	x8.i()
