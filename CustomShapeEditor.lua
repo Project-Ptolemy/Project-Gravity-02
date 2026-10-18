@@ -2,12 +2,29 @@
 -- of the main panel's UI scale; keyboard overlap only reduces the scroll area.
 return function(context, parent)
 	local x6, inputService = context.x6, context.v1
+	-- The same charcoal surfaces, indigo selection and mint field focus as UI.lua
+	-- and UI_elements.lua. This window lives directly under the ScreenGui so the
+	-- main panel's scale cannot inflate it beyond a phone's available viewport.
 	local colors = {
-		panel = Color3.fromRGB(17, 20, 29), field = Color3.fromRGB(25, 30, 42),
-		text = Color3.fromRGB(243, 247, 255), muted = Color3.fromRGB(168, 180, 200),
-		accent = Color3.fromRGB(83, 101, 235), line = Color3.fromRGB(54, 66, 88),
-		error = Color3.fromRGB(255, 160, 160), success = Color3.fromRGB(127, 226, 181),
+		panel = Color3.fromRGB(15, 15, 18), field = Color3.fromRGB(20, 20, 25),
+		raised = Color3.fromRGB(25, 25, 30), button = Color3.fromRGB(30, 30, 35),
+		text = Color3.fromRGB(255, 255, 255), muted = Color3.fromRGB(150, 150, 160),
+		accent = Color3.fromRGB(40, 40, 180), line = Color3.fromRGB(40, 40, 45),
+		focus = Color3.fromRGB(0, 255, 200), error = Color3.fromRGB(255, 120, 120),
+		success = Color3.fromRGB(80, 255, 150),
 	}
+	local touch = context.is_mobile or (inputService and inputService.TouchEnabled) or false
+	local connections, closed = {}, false
+	local function connect(signal, callback)
+		local connection = signal:Connect(callback)
+		connections[#connections + 1] = connection
+	end
+	local hoverMotion = context.ANIM and context.ANIM.HOVER
+		or TweenInfo.new(0.11, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+	local function tint(item, props)
+		if context.v6 then context.v6:Create(item, hoverMotion, props):Play()
+		else for key, value in pairs(props) do item[key] = value end end
+	end
 	local function create(class, name, owner, props)
 		local item = Instance.new(class)
 		item.Name = name
@@ -16,7 +33,7 @@ return function(context, parent)
 		return item
 	end
 	local function round(item, radius)
-		create("UICorner", "Corner", item, { CornerRadius = UDim.new(0, radius or 10) })
+		create("UICorner", "Corner", item, { CornerRadius = UDim.new(0, radius or 6) })
 	end
 	local function padding(item, amount)
 		create("UIPadding", "Padding", item, {
@@ -35,19 +52,34 @@ return function(context, parent)
 	local function label(name, owner, text, size, order)
 		return create("TextLabel", name, owner, {
 			BackgroundTransparency = 1, BorderSizePixel = 0, Text = text,
-			TextColor3 = colors.muted, Font = Enum.Font.Gotham, TextSize = size or 14,
+			TextColor3 = colors.muted, Font = Enum.Font.Gotham, TextSize = size or 12,
 			TextXAlignment = Enum.TextXAlignment.Left, TextYAlignment = Enum.TextYAlignment.Top,
 			TextWrapped = true, Size = UDim2.new(1, 0, 0, 0), AutomaticSize = Enum.AutomaticSize.Y,
 			LayoutOrder = order or 0, ZIndex = 203,
 		})
 	end
-	local function button(name, owner, text)
+	local function button(name, owner, text, primary)
+		local base = primary and colors.accent or colors.button
 		local item = create("TextButton", name, owner, {
-			BackgroundColor3 = colors.field, BorderSizePixel = 0, Text = text,
-			TextColor3 = colors.text, Font = Enum.Font.GothamBold, TextSize = 14,
-			TextWrapped = true, AutoButtonColor = true, ZIndex = 204,
+			BackgroundColor3 = base, BorderSizePixel = 0, Text = text,
+			TextColor3 = colors.text, Font = Enum.Font.GothamMedium, TextSize = 13,
+			TextWrapped = true, AutoButtonColor = false, ZIndex = 204,
 		})
 		round(item)
+		local outline = create("UIStroke", "ButtonOutline", item, {
+			Color = primary and Color3.fromRGB(70, 70, 200) or Color3.fromRGB(50, 50, 55),
+			Thickness = 1, ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
+		})
+		local function restore()
+			tint(item, { BackgroundColor3 = base })
+			tint(outline, { Transparency = 0 })
+		end
+		connect(item.MouseEnter, function()
+			if item.Active then tint(item, { BackgroundColor3 = primary and Color3.fromRGB(55, 55, 200) or Color3.fromRGB(40, 40, 45) }) end
+		end)
+		connect(item.MouseLeave, restore)
+		connect(item.MouseButton1Down, function() if item.Active then tint(outline, { Transparency = 0.65 }) end end)
+		connect(item.MouseButton1Up, restore)
 		return item
 	end
 	local function field(name, owner, placeholder, multiline)
@@ -55,38 +87,54 @@ return function(context, parent)
 			BackgroundColor3 = colors.field, BorderSizePixel = 0, Text = "",
 			PlaceholderText = placeholder, PlaceholderColor3 = colors.muted,
 			TextColor3 = colors.text, Font = multiline and Enum.Font.Code or Enum.Font.Gotham,
-			TextSize = multiline and 14 or 16, ClearTextOnFocus = false,
+			TextSize = multiline and 12 or 14, ClearTextOnFocus = false,
 			MultiLine = multiline == true, TextWrapped = true, TextEditable = true,
 			TextXAlignment = Enum.TextXAlignment.Left,
 			TextYAlignment = multiline and Enum.TextYAlignment.Top or Enum.TextYAlignment.Center,
-			Size = UDim2.new(1, 0, 0, multiline and 168 or 52), ZIndex = 204,
+			Size = UDim2.new(1, 0, 0, multiline and 100 or (touch and 44 or 36)), ZIndex = 204,
 		})
 	end
 	local overlay = create("TextButton", "CustomShapeEditor", parent, {
 		Size = UDim2.new(1, 0, 1, 0), BackgroundColor3 = Color3.fromRGB(0, 0, 0),
-		BackgroundTransparency = 0.28, BorderSizePixel = 0, Text = "", Visible = false,
+		BackgroundTransparency = 0.35, BorderSizePixel = 0, Text = "", Visible = false,
 		Active = true, Selectable = false, AutoButtonColor = false, Modal = true, ZIndex = 200,
 	})
 	local dialog = create("Frame", "CustomShapeDialog", overlay, {
 		BackgroundColor3 = colors.panel, BorderSizePixel = 0, Active = true, ZIndex = 201, ClipsDescendants = true,
 	})
 	create("UIStroke", "Outline", dialog, { Color = colors.line, Thickness = 1 })
-	round(dialog, 16)
-	local heading = label("EditorTitle", dialog, "Add a custom shape", 21)
+	round(dialog, 10)
+	local brand = label("EditorBrand", dialog, "PROJECT GRAVITY", 10)
+	brand.Font = Enum.Font.GothamBold
+	brand.Position, brand.Size = UDim2.new(0, 16, 0, 12), UDim2.new(1, -76, 0, 12)
+	brand.AutomaticSize = Enum.AutomaticSize.None
+	local heading = label("EditorTitle", dialog, "Custom shape", 19)
 	heading.Font, heading.TextColor3 = Enum.Font.GothamBold, colors.text
-	heading.Position, heading.Size = UDim2.new(0, 18, 0, 18), UDim2.new(1, -116, 0, 30)
+	heading.Position, heading.Size = UDim2.new(0, 16, 0, 28), UDim2.new(1, -76, 0, 24)
 	heading.AutomaticSize = Enum.AutomaticSize.None
-	local close = button("CloseShapeEditor", dialog, "Close")
-	close.Position, close.Size = UDim2.new(1, -86, 0, 10), UDim2.new(0, 72, 0, 48)
-	local steps = create("Frame", "ImportSteps", dialog, {
-		BackgroundTransparency = 1, Position = UDim2.new(0, 18, 0, 66), Size = UDim2.new(1, -36, 0, 32), ZIndex = 202,
+	local close = create("TextButton", "CloseShapeEditor", dialog, {
+		BackgroundTransparency = 1, Text = "", BorderSizePixel = 0, Active = true,
+		Position = UDim2.new(1, -52, 0, 8), Size = UDim2.new(0, 44, 0, 44), ZIndex = 204,
 	})
-	local importStep = label("ImportStep", steps, "01  Import script", 13)
-	local reviewStep = label("ReviewStep", steps, "02  Review & add", 13)
+	local closeGlyph = create("TextLabel", "CloseGlyph", close, {
+		BackgroundColor3 = Color3.fromRGB(200, 60, 60), BorderSizePixel = 0,
+		Position = UDim2.new(0.5, -11, 0.5, -11), Size = UDim2.new(0, 22, 0, 22),
+		Text = "\195\151", TextColor3 = colors.text, Font = Enum.Font.GothamBold, TextSize = 15, ZIndex = 205,
+	})
+	round(closeGlyph, 11)
+	connect(close.MouseEnter, function() tint(closeGlyph, { BackgroundColor3 = Color3.fromRGB(220, 90, 90) }) end)
+	connect(close.MouseLeave, function() tint(closeGlyph, { BackgroundColor3 = Color3.fromRGB(200, 60, 60) }) end)
+	local steps = create("Frame", "ImportSteps", dialog, {
+		BackgroundTransparency = 1, Position = UDim2.new(0, 16, 0, 64), Size = UDim2.new(1, -32, 0, 30), ZIndex = 202,
+	})
+	local importStep = label("ImportStep", steps, "1   Import Lua", 12)
+	local reviewStep = label("ReviewStep", steps, "2   Review & add", 12)
 	for index, item in ipairs({ importStep, reviewStep }) do
-		item.Position, item.Size = UDim2.new((index - 1) * 0.5, 0, 0, 0), UDim2.new(0.5, -4, 1, 0)
+		item.Position, item.Size = UDim2.new((index - 1) * 0.5, index == 1 and 0 or 4, 0, 0), UDim2.new(0.5, -4, 1, 0)
 		item.AutomaticSize, item.Font = Enum.AutomaticSize.None, Enum.Font.GothamBold
-		item.TextYAlignment = Enum.TextYAlignment.Center
+		item.TextYAlignment, item.TextXAlignment = Enum.TextYAlignment.Center, Enum.TextXAlignment.Center
+		item.BackgroundTransparency = 0
+		round(item)
 	end
 	local body = create("ScrollingFrame", "EditorFields", dialog, {
 		BackgroundTransparency = 1, BorderSizePixel = 0, ScrollBarThickness = 4,
@@ -94,27 +142,34 @@ return function(context, parent)
 		CanvasSize = UDim2.new(0, 0, 0, 0), CanvasPosition = Vector2.new(0, 0),
 		ScrollingDirection = Enum.ScrollingDirection.Y, Active = true, ZIndex = 202,
 	})
-	create("UIPadding", "ScrollPadding", body, { PaddingRight = UDim.new(0, 8), PaddingBottom = UDim.new(0, 16) })
-	create("UIListLayout", "FieldLayout", body, { Padding = UDim.new(0, 16), SortOrder = Enum.SortOrder.LayoutOrder })
-	local status = label("ShapeStatus", body, "", 14, 0)
+	create("UIPadding", "ScrollPadding", body, { PaddingRight = UDim.new(0, 6), PaddingBottom = UDim.new(0, 10) })
+	create("UIListLayout", "FieldLayout", body, { Padding = UDim.new(0, 12), SortOrder = Enum.SortOrder.LayoutOrder })
+	local status = label("ShapeStatus", body, "", 12, 0)
 	status.Visible = false
-	local form = stack("ImportForm", body, 1, 16)
-	label("LuaHelp", form, "Copy the Lua export from Shape Studio, then paste it below. Your draft stays here when you close this window.", 14, 1)
-	local nameGroup = stack("NameGroup", form, 2, 8)
-	local nameLabel = label("NameLabel", nameGroup, "Shape name", 14, 1)
+	status.BackgroundTransparency, status.BackgroundColor3 = 0, colors.raised
+	round(status); padding(status, 10)
+	local form = stack("ImportForm", body, 1, 12)
+	local details = stack("ImportDetails", form, 1, 10)
+	local nameGroup = stack("NameGroup", details, 1, 6)
+	local nameLabel = label("NameLabel", nameGroup, "SHAPE NAME", 10, 1)
 	nameLabel.TextColor3, nameLabel.Font = colors.text, Enum.Font.GothamBold
 	local name = field("ShapeName", nameGroup, "e.g. Orbit bloom", false)
 	name.LayoutOrder = 2
-	round(name); padding(name, 12)
+	round(name); padding(name, 10)
 	local nameOutline = create("UIStroke", "FieldOutline", name, { Color = colors.line, Thickness = 1, ApplyStrokeMode = Enum.ApplyStrokeMode.Border })
-	local sourceGroup = stack("SourceGroup", form, 3, 8)
-	local sourceLabel = label("SourceLabel", sourceGroup, "Lua script", 14, 1)
+	local help = label("LuaHelp", details, "Export Lua from Shape Studio, then paste your script here.", 12, 2)
+	local draftHint = label("DraftHelp", details, "Your draft is kept when you close this window.", 11, 3)
+	local sourceGroup = stack("SourceGroup", form, 2, 8)
+	local sourceLabel = label("SourceLabel", sourceGroup, "LUA SCRIPT", 10, 1)
 	sourceLabel.TextColor3, sourceLabel.Font = colors.text, Enum.Font.GothamBold
 	local pasteActions = create("Frame", "PasteActions", sourceGroup, {
-		BackgroundTransparency = 1, Size = UDim2.new(1, 0, 0, 48), LayoutOrder = 2, ZIndex = 203,
+		BackgroundTransparency = 1, Size = UDim2.new(1, 0, 0, touch and 44 or 32), LayoutOrder = 2, ZIndex = 203,
 	})
 	local paste = button("PasteShape", pasteActions, "Paste clipboard")
 	paste.Size = UDim2.new(0.62, -4, 1, 0)
+	local nativePaste = label("NativePasteHint", pasteActions, touch and "Press & hold to paste" or "Paste into the field below", 11)
+	nativePaste.Size, nativePaste.AutomaticSize = UDim2.new(1, -112, 1, 0), Enum.AutomaticSize.None
+	nativePaste.TextYAlignment = Enum.TextYAlignment.Center
 	local selectAll = button("SelectShapeSource", pasteActions, "Select all")
 	selectAll.Position, selectAll.Size = UDim2.new(0.62, 4, 0, 0), UDim2.new(0.38, -4, 1, 0)
 	local codeScroll = create("ScrollingFrame", "ShapeCodeScroll", sourceGroup, {
@@ -123,48 +178,48 @@ return function(context, parent)
 		CanvasPosition = Vector2.new(0, 0), ScrollingDirection = Enum.ScrollingDirection.Y,
 		ScrollBarThickness = 5, ScrollBarImageColor3 = colors.muted, Active = true, LayoutOrder = 3, ZIndex = 203,
 	})
-	round(codeScroll); padding(codeScroll, 12)
+	round(codeScroll); padding(codeScroll, 10)
 	local sourceOutline = create("UIStroke", "FieldOutline", codeScroll, { Color = colors.line, Thickness = 1 })
-	local luaSource = field("LuaSource", codeScroll, "Paste the complete .lua script here.\n\nOn a phone, press and hold to paste.", true)
+	local luaSource = field("LuaSource", codeScroll, touch and "Press and hold to paste your Lua export." or "Paste your complete Lua export here.", true)
 	luaSource.AutomaticSize, luaSource.BackgroundTransparency = Enum.AutomaticSize.Y, 1
-	local sourceInfo = label("ShapeSourceInfo", sourceGroup, "No script pasted yet", 12, 4)
-	label("ValidationHelp", form, "Review checks the Lua module and its controls. Review and Add both run the module.", 12, 4)
-	local review = stack("ShapeReview", body, 2, 16)
+	local sourceInfo = label("ShapeSourceInfo", sourceGroup, "No script pasted yet", 11, 4)
+	local review = stack("ShapeReview", body, 2, 12)
 	review.Visible = false
-	local reviewTitle = label("ReviewShapeName", review, "", 24, 1)
+	local function card(name, owner, order)
+		local item = stack(name, owner, order, 8)
+		item.BackgroundColor3, item.BackgroundTransparency = colors.raised, 0
+		round(item); padding(item, 12)
+		create("UIStroke", "Outline", item, { Color = colors.line, Thickness = 1 })
+		return item
+	end
+	local summary = card("ReviewSummary", review, 1)
+	local reviewTitle = label("ReviewShapeName", summary, "", 20, 1)
 	reviewTitle.Font, reviewTitle.TextColor3 = Enum.Font.GothamBold, colors.text
-	local reviewDetails = label("ReviewDetails", review, "", 14, 2)
-	local reviewControls = label("ReviewControls", review, "", 14, 3)
-	local reviewStorage = label("ReviewStorage", review, "", 14, 4)
-	label("ReviewHelp", review, "Add & use puts this shape in your modes and selects it immediately. Your other shapes stay available.", 14, 5)
-	local complete = stack("ShapeAdded", body, 3, 16)
+	local reviewDetails = label("ReviewDetails", summary, "", 12, 2)
+	local controlCard = card("ReviewControlCard", review, 2)
+	local controlTitle = label("ReviewControlTitle", controlCard, "INCLUDED CONTROLS", 10, 1)
+	controlTitle.Font = Enum.Font.GothamBold
+	local reviewControls = label("ReviewControls", controlCard, "", 13, 2)
+	reviewControls.TextColor3 = colors.text
+	local reviewStorage = label("ReviewStorage", review, "", 12, 3)
+	label("ReviewHelp", review, "Add & use selects this shape. Its controls will appear in the main panel.", 12, 4)
+	local complete = card("ShapeAdded", body, 3)
 	complete.Visible = false
-	local addedTitle = label("AddedShapeName", complete, "", 24, 1)
+	local addedTitle = label("AddedShapeName", complete, "", 20, 1)
 	addedTitle.Font, addedTitle.TextColor3 = Enum.Font.GothamBold, colors.success
-	local addedHelp = label("AddedShapeHelp", complete, "", 14, 2)
+	local addedHelp = label("AddedShapeHelp", complete, "", 13, 2)
 	local footer = create("Frame", "EditorActions", dialog, {
 		BackgroundColor3 = colors.panel, BorderSizePixel = 0, Size = UDim2.new(1, 0, 0, 76),
 		Position = UDim2.new(0, 0, 1, -76), ZIndex = 203,
 	})
-	create("Frame", "ActionDivider", footer, { Size = UDim2.new(1, -36, 0, 1), Position = UDim2.new(0, 18, 0, 0), BackgroundColor3 = colors.line, BorderSizePixel = 0, ZIndex = 203 })
+	create("Frame", "ActionDivider", footer, { Size = UDim2.new(1, 0, 0, 1), BackgroundColor3 = colors.line, BorderSizePixel = 0, ZIndex = 203 })
 	local back = button("BackShapeEditor", footer, "Back")
-	back.Position, back.Size = UDim2.new(0, 18, 0, 12), UDim2.new(0.34, -22, 0, 48)
-	local check = button("CheckShape", footer, "Review shape")
-	check.Position, check.Size = UDim2.new(0, 18, 0, 12), UDim2.new(1, -36, 0, 48)
-	local add = button("AddShape", footer, "Add & use")
-	add.Position, add.Size = UDim2.new(0.34, 4, 0, 12), UDim2.new(0.66, -22, 0, 48)
+	local check = button("CheckShape", footer, "Review shape", true)
+	local add = button("AddShape", footer, "Add & use", true)
 	local another = button("AnotherShape", footer, "Add another")
-	another.Position, another.Size = UDim2.new(0, 18, 0, 12), UDim2.new(0.5, -22, 0, 48)
-	local done = button("DoneShapeEditor", footer, "Done")
-	done.Position, done.Size = UDim2.new(0.5, 4, 0, 12), UDim2.new(0.5, -22, 0, 48)
-	check.BackgroundColor3, add.BackgroundColor3, done.BackgroundColor3 = colors.accent, colors.accent, colors.accent
+	local done = button("DoneShapeEditor", footer, "Done", true)
 
-	local connections, closed = {}, false
 	local stage, busy, changing, reviewed = "import", false, false, nil
-	local function connect(signal, callback)
-		local connection = signal:Connect(callback)
-		connections[#connections + 1] = connection
-	end
 	local function alive() return not closed and not x6.torn_down and overlay.Parent ~= nil end
 	local function setStatus(message, kind)
 		status.Text, status.Visible = tostring(message or ""), message ~= nil and message ~= ""
@@ -188,7 +243,7 @@ return function(context, parent)
 		check.Visible, add.Visible, back.Visible = stage == "import", stage == "review", stage == "review"
 		another.Visible, done.Visible = stage == "added", stage == "added"
 		for _, item in ipairs({ check, add, back, paste, selectAll, another }) do
-			item.Active, item.AutoButtonColor = not busy, not busy
+			item.Active, item.AutoButtonColor = not busy, false
 			item.TextTransparency = busy and 0.4 or 0
 		end
 		add.Active = not busy and stage == "review"
@@ -196,10 +251,12 @@ return function(context, parent)
 		name.TextEditable, luaSource.TextEditable = not busy, not busy
 		importStep.TextColor3 = stage == "import" and colors.text or colors.muted
 		reviewStep.TextColor3 = stage ~= "import" and colors.success or colors.muted
+		importStep.BackgroundColor3 = stage == "import" and colors.accent or colors.raised
+		reviewStep.BackgroundColor3 = stage ~= "import" and colors.raised or colors.field
 		local canPaste = clipboardReader() ~= nil
-		paste.Visible = canPaste
-		selectAll.Position = canPaste and UDim2.new(0.62, 4, 0, 0) or UDim2.new(0, 0, 0, 0)
-		selectAll.Size = canPaste and UDim2.new(0.38, -4, 1, 0) or UDim2.new(1, 0, 1, 0)
+		paste.Visible, nativePaste.Visible = canPaste, not canPaste
+		selectAll.Position = canPaste and UDim2.new(0.62, 4, 0, 0) or UDim2.new(1, -100, 0, 0)
+		selectAll.Size = canPaste and UDim2.new(0.38, -4, 1, 0) or UDim2.new(0, 100, 1, 0)
 		local length = #luaSource.Text
 		sourceInfo.Text = length == 0 and "No script pasted yet" or (bytes(length) .. " pasted  /  Lua module")
 	end
@@ -223,30 +280,60 @@ return function(context, parent)
 			end)
 		end
 		if keyboardTop then height = math.min(height, math.max(0, keyboardTop)) end
-		local margin = keyboardTop and 4 or (width < 480 and 8 or 18)
-		local w, h = math.min(660, width - margin * 2), math.min(760, height - margin * 2)
+		local margin = keyboardTop and 4 or (width < 480 and 8 or 16)
+		local landscape = width >= 560 and height < 480
+		local w = math.max(0, math.min(landscape and 740 or 600, width - margin * 2))
+		local h = math.max(0, math.min(620, height - margin * 2))
 		dialog.Size, dialog.Position = UDim2.new(0, w, 0, h), UDim2.new(0, (width - w) * 0.5, 0, (height - h) * 0.5)
-		local compact = h < 450
+		local compact = h < 440
 		steps.Visible = not compact
-		local top, bottom = compact and 62 or 110, compact and 68 or 78
+		brand.Visible = not compact
+		heading.Position = UDim2.new(0, 16, 0, compact and 16 or 28)
+		close.Position = UDim2.new(1, -52, 0, compact and 4 or 8)
+		local actionHeight = touch and 44 or 36
+		local top, bottom = compact and 56 or 106, actionHeight + 20
 		-- In the smallest landscape keyboard area, keep the focused field and
 		-- Close reachable. The action row returns when the keyboard is dismissed.
 		footer.Visible = h >= 150
 		if not footer.Visible then bottom = 0 end
 		footer.Size, footer.Position = UDim2.new(1, 0, 0, bottom), UDim2.new(0, 0, 1, -bottom)
-		body.Position, body.Size = UDim2.new(0, 18, 0, top), UDim2.new(1, -36, 0, math.max(0, h - top - bottom))
-		codeScroll.Size = UDim2.new(1, 0, 0, compact and 164 or 220)
-		heading.TextSize = w < 360 and 17 or 21
+		body.Position, body.Size = UDim2.new(0, 16, 0, top), UDim2.new(1, -32, 0, math.max(0, h - top - bottom))
+		-- Put the name and guidance beside the script in landscape. All fields stay
+		-- in the same scrolling body, preserving drafts and keyboard focus on rotate.
+		local columns = compact and w >= 500
+		form.Layout.FillDirection = columns and Enum.FillDirection.Horizontal or Enum.FillDirection.Vertical
+		details.Size = columns and UDim2.new(0.34, -8, 0, 0) or UDim2.new(1, 0, 0, 0)
+		sourceGroup.Size = columns and UDim2.new(0.66, -4, 0, 0) or UDim2.new(1, 0, 0, 0)
+		help.Visible, draftHint.Visible = true, not compact
+		codeScroll.Size = UDim2.new(1, 0, 0, columns and math.max(110, h - top - bottom - 100)
+			or math.max(128, math.min(210, h - 386)))
+		heading.TextSize = w < 360 and 17 or 19
+		back.Position, back.Size = UDim2.new(0, 16, 0, 10), UDim2.new(0.34, -20, 0, actionHeight)
+		check.Position, check.Size = UDim2.new(0, 16, 0, 10), UDim2.new(1, -32, 0, actionHeight)
+		add.Position, add.Size = UDim2.new(0.34, 4, 0, 10), UDim2.new(0.66, -20, 0, actionHeight)
+		another.Position, another.Size = UDim2.new(0, 16, 0, 10), UDim2.new(0.5, -20, 0, actionHeight)
+		done.Position, done.Size = UDim2.new(0.5, 4, 0, 10), UDim2.new(0.5, -20, 0, actionHeight)
 	end
 	local function showField(item)
 		if not overlay.Visible or stage ~= "import" then return end
-		local relative = item.AbsolutePosition.Y - body.AbsolutePosition.Y + body.CanvasPosition.Y
-		body.CanvasPosition = Vector2.new(0, math.max(0, relative - 10))
+		-- Scroll only when a field is clipped. Looking at the source viewport
+		-- rather than the growing TextBox avoids jumping to the end of a long file.
+		local target = item == luaSource and codeScroll or item
+		local top = target.AbsolutePosition.Y - body.AbsolutePosition.Y
+		local available = body.AbsoluteSize.Y
+		if available <= 0 then return end
+		local bottom = top + math.min(target.AbsoluteSize.Y, available)
+		local offset = top < 0 and top or (bottom > available and bottom - available or 0)
+		if offset ~= 0 then body.CanvasPosition = Vector2.new(0, math.max(0, body.CanvasPosition.Y + offset)) end
 	end
+	connect(body:GetPropertyChangedSignal("AbsoluteSize"), function()
+		if luaSource:IsFocused() then showField(luaSource) elseif name:IsFocused() then showField(name) end
+	end)
 	local function edited()
 		if changing then return end
 		stage, reviewed = "import", nil
-		nameOutline.Color, sourceOutline.Color = colors.line, colors.line
+		nameOutline.Color = name:IsFocused() and colors.focus or colors.line
+		sourceOutline.Color = luaSource:IsFocused() and colors.focus or colors.line
 		setStatus(nil); refresh()
 	end
 	connect(name:GetPropertyChangedSignal("Text"), edited)
@@ -261,7 +348,11 @@ return function(context, parent)
 		end
 		edited()
 	end)
-	for _, item in ipairs({ name, luaSource }) do connect(item.Focused, function() layout(); showField(item) end) end
+	for _, item in ipairs({ name, luaSource }) do
+		local outline = item == name and nameOutline or sourceOutline
+		connect(item.Focused, function() tint(outline, { Color = colors.focus }); layout(); showField(item) end)
+		connect(item.FocusLost, function() tint(outline, { Color = colors.line }) end)
+	end
 	connect(name.FocusLost, function(enterPressed)
 		if enterPressed and overlay.Visible and stage == "import" and not busy then luaSource:CaptureFocus() end
 	end)
@@ -315,13 +406,16 @@ return function(context, parent)
 			stage, reviewed = "review", { name = requestedName, source = requestedSource }
 			reviewTitle.Text = result.name
 			local controls = result.module and result.module.Controls or {}
-			reviewDetails.Text = "Lua module checked  /  " .. bytes(#result.source) .. "\n" .. tostring(#controls) .. " custom control" .. (#controls == 1 and "" or "s")
+			reviewDetails.Text = bytes(#result.source) .. " Lua module  /  " .. tostring(#controls) .. " custom control" .. (#controls == 1 and "" or "s")
 			local names = {}
-			for index = 1, math.min(8, #controls) do names[#names + 1] = controls[index].Name end
-			reviewControls.Text = #names > 0 and ("Controls: " .. table.concat(names, ", ") .. (#controls > 8 and ", ..." or "")) or "This module has no custom controls."
+			for index = 1, math.min(8, #controls) do
+				local control = controls[index]
+				names[#names + 1] = control.Name .. "  /  " .. tostring(control.Type)
+			end
+			reviewControls.Text = #names > 0 and (table.concat(names, "\n") .. (#controls > 8 and ("\n+ " .. (#controls - 8) .. " more") or "")) or "Uses Gravity's standard shape settings."
 			reviewStorage.Text = type(writefile) == "function"
-				and "Gravity will try to save this shape for future launches. The result will show whether it was saved."
-				or "This executor has no file saving. The shape will be available for this session."
+				and "Gravity will save this shape for your next launch if file access is available."
+				or "Available for this session. Your executor does not support saving files."
 			setStatus("Looks good. Ready to add.", "success")
 		end
 		refresh(); layout()

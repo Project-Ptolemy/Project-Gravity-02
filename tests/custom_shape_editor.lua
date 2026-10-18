@@ -192,8 +192,17 @@ for _, mobile in ipairs({ false, true }) do
     node("LuaSource"):ReleaseFocus()
     node("ShapeName"):CaptureFocus(); node("ShapeName"):ReleaseFocus(true)
     check(node("LuaSource"):IsFocused(), mode .. " the name keyboard action advances to the Lua field")
+    node("LuaSource"):ReleaseFocus()
+    node("EditorFields").AbsolutePosition, node("EditorFields").AbsoluteSize = Vector2.new(16, 100), Vector2.new(300, 300)
+    node("EditorFields").CanvasPosition = Vector2.new(0, 40)
+    node("ShapeCodeScroll").AbsolutePosition, node("ShapeCodeScroll").AbsoluteSize = Vector2.new(16, 150), Vector2.new(300, 160)
+    node("LuaSource"):CaptureFocus()
+    check(node("EditorFields").CanvasPosition.Y == 40, mode .. " focusing a fully visible script does not jump the outer scroller")
+    node("EditorFields").AbsoluteSize = Vector2.new(300, 100)
+    check(node("EditorFields").CanvasPosition.Y == 90, mode .. " a shrinking viewport brings the focused script above the keyboard")
+    node("LuaSource"):ReleaseFocus()
 
-    for _, viewport in ipairs({ { 320, 568 }, { 844, 350 }, { 1280, 900 } }) do
+    for _, viewport in ipairs({ { 320, 568 }, { 390, 844 }, { 568, 320 }, { 844, 350 }, { 1280, 900 } }) do
         editor.AbsoluteSize = Vector2.new(viewport[1], viewport[2])
         local dialog = node("CustomShapeDialog")
         check(dialog.Position.X.Offset >= 0 and dialog.Position.Y.Offset >= 0
@@ -201,8 +210,17 @@ for _, mobile in ipairs({ false, true }) do
             and dialog.Position.Y.Offset + dialog.Size.Y.Offset <= viewport[2],
             mode .. " dialog fits " .. viewport[1] .. "x" .. viewport[2])
         for _, target in ipairs({ "CloseShapeEditor", "CheckShape", "AddShape", "AnotherShape", "DoneShapeEditor" }) do
-            check(node(target).Size.Y.Offset >= 48, mode .. " retains touch height for " .. target)
+            local minimum = target == "CloseShapeEditor" and 44 or (mobile and 44 or 36)
+            check(node(target).Size.Y.Offset >= minimum, mode .. " retains an accessible target for " .. target)
         end
+        check(node("EditorFields").Size.Y.Offset > 0 and dialog.Size.Y.Offset <= 620,
+            mode .. " keeps the editor compact with a usable scrolling body")
+        local landscape = viewport[1] >= 532 and viewport[2] < 480
+        check((node("ImportDetails").Size.X.Scale < 1) == landscape
+            and (node("SourceGroup").Size.X.Scale < 1) == landscape,
+            mode .. " lays out the name beside the script when landscape has enough width")
+        check(node("EditorActions").Size.Y.Offset >= node("CheckShape").Position.Y.Offset + node("CheckShape").Size.Y.Offset,
+            mode .. " contains the action target inside its fixed footer")
     end
     editor.AbsoluteSize, editor.AbsolutePosition = Vector2.new(844, 350), Vector2.new(0, 36)
     keyboard(true, 216, 134)

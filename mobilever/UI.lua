@@ -2289,14 +2289,21 @@ return function(context)
 			local custom = Instance.new("TextButton", dlst_container)
 			custom.Name = "CustomShapeEntry"
 			custom.Position = UDim2.new(0, 10, 0, 63)
-			custom.Size = UDim2.new(1, -20, 0, 52)
-			custom.BackgroundColor3 = Color3.fromRGB(47, 49, 113)
-			custom.TextColor3 = Color3.fromRGB(245, 245, 250)
-			custom.Font = Enum.Font.GothamBold
-			custom.TextSize = 14
+			custom.Size = UDim2.new(1, -20, 0, 44)
+			custom.BackgroundColor3 = Color3.fromRGB(30, 30, 35)
+			custom.TextColor3 = Color3.fromRGB(220, 220, 220)
+			custom.Font = Enum.Font.GothamMedium
+			custom.TextSize = 13
 			custom.Text = "+ Custom shape"
+			custom.AutoButtonColor = false
 			custom.ZIndex = 12
 			Instance.new("UICorner", custom).CornerRadius = UDim.new(0, 6)
+			local outline = Instance.new("UIStroke", custom)
+			outline.Color = Color3.fromRGB(50, 50, 55)
+			outline.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+			row_hover(custom, Color3.fromRGB(30, 30, 35), Color3.fromRGB(40, 40, 45),
+				outline, Color3.fromRGB(50, 50, 55), Color3.fromRGB(70, 70, 78))
+			UI_elements.press(custom)
 			local editor, loading
 			custom.Activated:Connect(function()
 				if loading or x6.torn_down then return end
@@ -2328,8 +2335,8 @@ return function(context)
 
 		local dlst = Instance.new("ScrollingFrame", dlst_container)
 		dlst.BackgroundTransparency = 1
-		dlst.Position = UDim2.new(0, 0, 0, 123)
-		dlst.Size = UDim2.new(1, 0, 1, -133)
+		dlst.Position = UDim2.new(0, 0, 0, 115)
+		dlst.Size = UDim2.new(1, 0, 1, -125)
 		dlst.ScrollBarThickness = 0
 		dlst.AutomaticCanvasSize = Enum.AutomaticSize.Y
 		dlst.CanvasSize = UDim2.new(0, 0, 0, 0)

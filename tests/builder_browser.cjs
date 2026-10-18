@@ -265,7 +265,7 @@ async function mobile(page, url) {
   await openDisclosure(orbitGroup);
   await editNumber(page, 'input[type="number"][data-prop="orbitRadius"]', 15);
   assert.equal(await page.locator('input[type="number"][data-prop="orbitRadius"]').inputValue(), '15');
-  await page.locator('#controls-tab').tap();
+  await page.locator('#mobile-navigation [data-panel="controls"]').tap();
   await page.locator('#new-control').tap();
   assert.ok(await page.locator('#control-name').isVisible());
   assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), 'mobile control dialog fits');

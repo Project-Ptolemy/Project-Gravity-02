@@ -5,6 +5,9 @@ export function createMobileLayout(onInspectorTab) {
   const navigation = document.getElementById('mobile-navigation');
   const left = document.querySelector('.left-panel');
   const right = document.querySelector('.right-panel');
+  const status = document.querySelector('.statusbar');
+  const statusHome = document.createComment('Desktop project status');
+  status.before(statusHome);
   let panel = 'scene';
   const scrollPositions = new Map();
 
@@ -19,6 +22,10 @@ export function createMobileLayout(onInspectorTab) {
     }
     left.inert = media.matches && panel !== 'scene';
     right.inert = media.matches && !['properties', 'controls'].includes(panel);
+    // Keep project tools available in Layers without reserving a second footer
+    // on a small screen. Moving the original preserves its controls and status.
+    if (media.matches && status.parentElement !== left) left.append(status);
+    else if (!media.matches && status.parentElement === left) statusHome.after(status);
     if (media.matches && previous !== panel) {
       const target = panel === 'scene' ? left : right;
       target.scrollTop = scrollPositions.get(panel) || 0;
@@ -33,15 +40,26 @@ export function createMobileLayout(onInspectorTab) {
   });
   media.addEventListener('change', () => show(panel));
 
+  let layoutWidth = window.innerWidth;
+  let layoutHeight = window.innerHeight;
   function resize() {
     const visual = window.visualViewport;
     // Preserve pinch-to-zoom accessibility: browser zoom must not shrink the app.
     const height = visual && visual.scale === 1 ? visual.height : window.innerHeight;
+    // Android can resize the layout viewport as well as the visual viewport.
+    // A width change starts a new orientation; a keyboard only reduces height.
+    if (Math.abs(window.innerWidth - layoutWidth) > 80) layoutHeight = window.innerHeight;
+    layoutWidth = window.innerWidth;
+    layoutHeight = Math.max(layoutHeight, window.innerHeight);
+    const typing = document.activeElement?.matches('input, textarea, [contenteditable=true]');
+    const keyboard = window.innerHeight - height > 120 || (typing && layoutHeight - height > 120);
     document.documentElement.style.setProperty('--app-height', `${height}px`);
-    document.body.classList.toggle('keyboard-open', media.matches && window.innerHeight - height > 120);
+    document.body.classList.toggle('keyboard-open', media.matches && (!visual || visual.scale === 1) && Boolean(keyboard));
   }
   window.visualViewport?.addEventListener('resize', resize);
   window.addEventListener('resize', resize);
+  document.addEventListener('focusin', resize);
+  document.addEventListener('focusout', () => queueMicrotask(resize));
   show(panel);
   resize();
   return { show, get active() { return media.matches; } };

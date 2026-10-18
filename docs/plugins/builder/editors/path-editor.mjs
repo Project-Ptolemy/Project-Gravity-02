@@ -33,6 +33,7 @@ export function openPathEditor({ path, onApply, minPoints = 2 }) {
   dialog.innerHTML = `
     <header class="path-editor-header">
       <div><p class="path-editor-eyebrow">CUSTOM GEOMETRY</p><h2 id="path-editor-title">Make your own path</h2></div>
+      <button type="button" class="path-editor-mobile-switch" data-action="toggle-properties" aria-controls="path-editor-properties" aria-expanded="false" hidden>Settings</button>
       <button type="button" class="path-editor-close" data-action="cancel" aria-label="Close path editor">&times;</button>
     </header>
     <div class="path-editor-toolbar">
@@ -52,10 +53,12 @@ export function openPathEditor({ path, onApply, minPoints = 2 }) {
     <div class="path-editor-body">
       <div class="path-editor-canvas-wrap">
         <canvas tabindex="0" aria-label="Custom path drawing canvas" aria-describedby="path-editor-instructions path-editor-keyboard"></canvas>
+        <div class="path-editor-canvas-controls" hidden></div>
+        <details class="path-editor-mobile-help" hidden><summary aria-label="Drawing tips">?</summary><p></p></details>
         <span class="path-editor-axes" aria-hidden="true"></span>
         <span class="path-editor-readout" aria-hidden="true"></span>
       </div>
-      <aside class="path-editor-properties" aria-label="Path properties">
+      <aside class="path-editor-properties" id="path-editor-properties" aria-label="Path properties" tabindex="-1">
         <div class="path-editor-property-heading"><h3>Path settings</h3><output data-field="count"></output></div>
         <div class="path-editor-checks"><label><input type="checkbox" data-field="closed"> Closed loop</label><label><input type="checkbox" data-field="smooth"> Smooth curve</label></div>
         <div class="path-editor-snap"><label><input type="checkbox" data-field="snap"> Snap to grid</label><label class="path-editor-inline">Step <input type="number" data-field="step" value="10" min="0.01" max="1000" step="any" aria-label="Grid snapping step"></label></div>
@@ -67,6 +70,7 @@ export function openPathEditor({ path, onApply, minPoints = 2 }) {
         <div class="path-editor-vertex-heading"><h3>Active vertex</h3><div class="path-editor-vertex-nav"><button type="button" data-action="previous" aria-label="Select previous vertex">‹</button><input type="number" data-field="vertex" min="1" step="1" aria-label="Selected vertex number"><button type="button" data-action="next" aria-label="Select next vertex">›</button></div></div>
         <div class="path-editor-coordinates">${['x', 'y', 'z'].map(axis => `<label>${axis.toUpperCase()}<input type="number" data-coordinate="${axis}" min="-5000" max="5000" step="any" aria-label="Vertex ${axis.toUpperCase()} coordinate"></label>`).join('')}</div>
         <div class="path-editor-node-actions"><button type="button" data-action="insert">Insert vertex</button><button type="button" data-action="delete">Delete vertex</button></div>
+        <div class="path-editor-draft-actions" role="group" aria-label="Draft actions" hidden></div>
         <details class="path-editor-transforms">
           <summary>Transform selection</summary>
           <p class="path-editor-note">Scale, then rotate X → Y → Z around the selection center, then move. Negative scale mirrors; zero flattens.</p>
@@ -83,6 +87,7 @@ export function openPathEditor({ path, onApply, minPoints = 2 }) {
     <footer class="path-editor-footer">
       <div class="path-editor-history"><button type="button" data-action="undo">Undo</button><button type="button" data-action="redo">Redo</button><button type="button" data-action="remove-last">Remove last</button><button type="button" data-action="clear">Clear</button></div>
       <p class="path-editor-status" role="status" aria-live="polite"></p>
+      <output class="path-editor-mobile-count" data-field="mobile-count" aria-label="Vertex count" hidden></output>
       <div class="path-editor-final-actions"><button type="button" data-action="cancel">Cancel</button><button type="button" class="path-editor-apply" data-action="apply">Apply path</button></div>
     </footer>`;
   document.body.append(dialog);
@@ -96,6 +101,33 @@ export function openPathEditor({ path, onApply, minPoints = 2 }) {
     $('.path-editor-checks').hidden = true;
     action('apply').textContent = 'Apply points';
     $('.path-editor-properties > .path-editor-note').textContent = 'Each vertex is a separate point. Change planes or enter coordinates to arrange your points in 3D.';
+  }
+  // Keep a single set of controls and draft state as orientation/viewport changes.
+  // The compact stylesheet opts in; standalone desktop editor integrations stay intact.
+  const compactViewport = window.matchMedia('(max-width: 1024px), (max-height: 500px) and (pointer: coarse)');
+  const mobileSwitch = action('toggle-properties');
+  const canvasControls = $('.path-editor-canvas-controls');
+  const mobileHelp = $('.path-editor-mobile-help');
+  const planeControl = field('plane').closest('label');
+  const zoomControls = $('.path-editor-zoom');
+  const draftActions = $('.path-editor-draft-actions');
+  let compact = false;
+  dialog.dataset.mobilePanel = 'canvas';
+  function setMobilePanel(panel, focus = false) {
+    cancelPointers();
+    dialog.dataset.mobilePanel = panel;
+    mobileSwitch.textContent = panel === 'properties' ? 'Canvas' : 'Settings';
+    mobileSwitch.setAttribute('aria-expanded', String(panel === 'properties'));
+    mobileSwitch.setAttribute('aria-label', panel === 'properties' ? 'Return to drawing canvas' : 'Edit path settings and vertices');
+    if (focus) requestAnimationFrame(() => { if (alive) (panel === 'properties' ? $('.path-editor-properties') : canvas).focus({ preventScroll: true }); });
+  }
+  function syncCompactLayout() {
+    compact = compactViewport.matches && getComputedStyle(dialog).getPropertyValue('--path-compact').trim() === '1';
+    mobileSwitch.hidden = canvasControls.hidden = mobileHelp.hidden = draftActions.hidden = field('mobile-count').hidden = !compact;
+    $('#path-editor-title').textContent = pointCloud ? (compact ? 'Point cloud' : 'Shape your point cloud') : (compact ? 'Draw a path' : 'Make your own path');
+    (compact ? canvasControls : $('.path-editor-toolbar')).append(planeControl, zoomControls);
+    (compact ? draftActions : $('.path-editor-history')).append(action('remove-last'), action('clear'));
+    if (!compact) setMobilePanel('canvas');
   }
   const selectOnly = index => { selected = index; selection = new Set(index >= 0 ? [index] : []); };
   const state = () => ({ draft: copy(draft), selected, selection: [...selection] });
@@ -114,7 +146,7 @@ export function openPathEditor({ path, onApply, minPoints = 2 }) {
     draft.points.forEach((point, index) => { const p = pixel(point); const d = (p.x - position.x) ** 2 + (p.y - position.y) ** 2; if (d <= distance) { closest = index; distance = d; } });
     return closest;
   };
-  const report = message => { $('.path-editor-status').textContent = message; };
+  const report = (message, important = true) => { const status = $('.path-editor-status'); status.textContent = message; status.dataset.important = String(important); };
   const setMode = next => { mode = next; hover = null; refresh(); };
   function refresh() {
     if (!alive) return;
@@ -125,6 +157,7 @@ export function openPathEditor({ path, onApply, minPoints = 2 }) {
     field('closed').checked = draft.closed;
     field('smooth').checked = draft.smooth;
     field('count').textContent = `${draft.points.length.toLocaleString()} vertices`;
+    field('mobile-count').textContent = `${draft.points.length.toLocaleString()} pts`;
     field('selection-count').textContent = `${selection.size.toLocaleString()} selected`;
     field('selection-center').textContent = selection.size ? `Center: ${Object.entries(selectionCenter(draft.points, selection)).map(([axis, value]) => `${axis.toUpperCase()} ${rounded(value)}`).join(' · ')}` : 'Select vertices to transform.';
     field('vertex').value = selected >= 0 ? selected + 1 : '';
@@ -149,10 +182,11 @@ export function openPathEditor({ path, onApply, minPoints = 2 }) {
       freehand: pointCloud ? 'Drag to place points along a stroke. Undo removes the entire stroke.' : 'Drag to sketch a connected stroke. Enable Smooth curve for flowing lines; Undo removes the stroke.',
       pan: 'Drag to move the canvas. Scroll to zoom, or use + / −. Fit brings the whole path into view.'
     }[mode] + ' Use two fingers to pan and pinch to zoom in any tool.';
+    $('.path-editor-mobile-help p').textContent = $('.path-editor-instructions').textContent;
     field('depth-axis').textContent = axes()[2].toUpperCase();
     field('depth').setAttribute('aria-label', `New point ${axes()[2].toUpperCase()} coordinate`);
     $('.path-editor-axes').textContent = `${axes()[0].toUpperCase()} →   ${axes()[1].toUpperCase()} ↑`;
-    report(draft.points.length < minPoints ? `Add at least ${minPoints} ${minPoints === 1 ? 'vertex' : 'vertices'} to apply.` : 'Changes stay in this draft until you apply.');
+    report(draft.points.length < minPoints ? `Add at least ${minPoints} ${minPoints === 1 ? 'vertex' : 'vertices'} to apply.` : 'Changes stay in this draft until you apply.', false);
     render();
   }
   function drawPolyline(points, close = false) {
@@ -227,7 +261,9 @@ export function openPathEditor({ path, onApply, minPoints = 2 }) {
     const ys = draft.points.map(point => point[vertical]);
     const lowX = Math.min(...xs), highX = Math.max(...xs), lowY = Math.min(...ys), highY = Math.max(...ys);
     view.x = (lowX + highX) / 2; view.y = (lowY + highY) / 2;
-    view.scale = Math.max(0.025, Math.min(250, (width - 86) / Math.max(60, highX - lowX), (height - 86) / Math.max(60, highY - lowY)));
+    // Leave fitted vertices clear of the compact canvas's floating controls.
+    const verticalPadding = compact ? 120 : 86;
+    view.scale = Math.max(0.025, Math.min(250, (width - 86) / Math.max(60, highX - lowX), (height - verticalPadding) / Math.max(60, highY - lowY)));
     render();
   }
   function zoom(factor, at = { x: width / 2, y: height / 2 }) {
@@ -415,6 +451,7 @@ export function openPathEditor({ path, onApply, minPoints = 2 }) {
     if (!button || pointers.size) return;
     if (button.dataset.mode) { setMode(button.dataset.mode); return; }
     switch (button.dataset.action) {
+      case 'toggle-properties': setMobilePanel(dialog.dataset.mobilePanel === 'properties' ? 'canvas' : 'properties', true); break;
       case 'cancel': dialog.close(); break;
       case 'apply': if (draft.points.length >= minPoints) { onApply(copy(draft)); dialog.close(); } break;
       case 'frame': fit(); break;
@@ -457,6 +494,8 @@ export function openPathEditor({ path, onApply, minPoints = 2 }) {
     // Keep editor shortcuts local; the scene underneath has its own shortcuts.
     event.stopPropagation();
     if (event.key === 'Escape' && pointers.size) { event.preventDefault(); cancelPointers(); return; }
+    if (event.key === 'Escape' && compact && mobileHelp.open) { event.preventDefault(); mobileHelp.open = false; canvas.focus({ preventScroll: true }); return; }
+    if (event.key === 'Escape' && compact && dialog.dataset.mobilePanel === 'properties') { event.preventDefault(); setMobilePanel('canvas', true); return; }
     const editing = event.target.matches('input, textarea, select');
     if (editing || pointers.size) return;
     const key = event.key.toLowerCase();
@@ -491,9 +530,10 @@ export function openPathEditor({ path, onApply, minPoints = 2 }) {
     alive = false; cancelPointers(); resize.disconnect();
     window.removeEventListener('blur', cancelPointers);
     document.removeEventListener('visibilitychange', visibilityChange);
+    compactViewport.removeEventListener('change', syncCompactLayout);
     dialog.remove();
   }, { once: true });
-  dialog.showModal(); resize.observe(canvas); refresh();
+  dialog.showModal(); syncCompactLayout(); compactViewport.addEventListener('change', syncCompactLayout); resize.observe(canvas); refresh();
   requestAnimationFrame(() => { if (alive) { const rect = canvas.getBoundingClientRect(); width = rect.width; height = rect.height; fit(); canvas.focus({ preventScroll: true }); } });
   return dialog;
 }
