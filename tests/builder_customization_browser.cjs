@@ -113,6 +113,7 @@ async function screenshot(page, name) {
     const mobile = await browser.newPage({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, reducedMotion: 'reduce' });
     watch(mobile); await mobile.goto(url); await mobile.locator('#layers .layer-row').first().waitFor();
     await importProject(mobile, repeated);
+    await mobile.locator('#mobile-navigation [data-panel="properties"]').tap();
     await mobile.locator('#make-surface').tap();
     await mobile.locator('#surface-mode').selectOption('revolve');
     assert.ok(await mobile.locator('#surface-editor').evaluate(dialog => dialog.scrollWidth <= dialog.clientWidth));
@@ -120,6 +121,7 @@ async function screenshot(page, name) {
     await mobile.locator('#surface-apply').tap();
     await mobile.locator('#surface-editor').waitFor({ state: 'detached' });
     assert.equal(await mobile.locator('#layers .layer-row').count(), 5);
+    await mobile.locator('#mobile-navigation [data-panel="scene"]').tap();
     await mobile.locator('#repeat-layer').tap();
     await mobile.locator('#repeat-mode').selectOption('radial');
     assert.ok(await mobile.locator('#repeat-editor').evaluate(dialog => dialog.scrollWidth <= dialog.clientWidth));

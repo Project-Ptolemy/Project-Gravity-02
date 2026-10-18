@@ -6,6 +6,20 @@ separate page. The editor is plain HTML, CSS and
 JavaScript modules. Its 3D preview uses Canvas; no framework, package installation
 or build step is needed to use or serve it.
 
+## On a phone or tablet
+
+Use the bottom bar to switch between **Preview**, **Layers**, **Edit**, and
+**Controls**. Layers and properties use the full screen width, with a live preview
+above them. Preview expands the canvas and reveals the Move, Core, and Snap tools.
+In landscape, the preview and active panel sit side by side. The layout adapts to
+the software keyboard and device safe areas.
+
+Drag empty space to orbit; pinch with two fingers to zoom and pan. Touch starts in
+camera mode. Enable **Move** in the expanded preview to drag a layer or its XYZ
+handles. Starting a pinch cancels an unfinished geometry move. In the path editor,
+a two-finger gesture navigates without adding vertices. Exact numeric fields and
+sliders have large touch targets; typed geometry values retain their precision.
+
 ## Create your own geometry
 
 - **Custom paths:** Place vertices or draw a freehand stroke. Edit points in
@@ -128,8 +142,9 @@ Save a JSON project to keep an editable, portable copy. Browser autosave is loca
 to the browser and site origin and depends on available storage. Large projects
 can exceed the browser's quota; the editor will tell you to save JSON instead.
 Choose **Export → Copy Lua**, then open the in-game shape selector and choose
-**+ Custom shape**. Name your formation, paste the full Lua script, and click
-**Add & use**. Its controls appear immediately on desktop or mobile. The game
+**+ Custom shape**. Paste the full Lua script, name your formation, and choose
+**Review shape**, then **Add & use**. The review shows its controls and whether it
+can be saved locally. Closing the editor retains an unfinished draft. Its controls appear immediately on desktop or mobile. The game
 saves it in `GravityShapes` when your executor supports file storage; otherwise
 the editor reports that it is available for this session only. You can also
 download a `.lua` plugin, put it in `GravityShapes`, and restart Project Gravity
@@ -146,8 +161,15 @@ layer at its geometry limit. SVG and coordinate source imports retain a separate
 the original source files to reopen.
 Imported and generated coordinates must be between −5,000 and 5,000 studs.
 Very detailed outlines need enough debris to remain legible. The preview samples
-geometry; live Roblox physics, network ownership and available parts determine
-the in-game result.
+target positions in studs relative to the Gravity core, with
+Y up. Match the debris count, shape controls, and animation time when comparing
+it to the game. Browser and exported Lua use the same sample allocation, local
+geometry, deformation, rotation and world offsets. Animated exports request the
+system's per-frame tracking; static exports retain normal scheduling. Live Roblox
+physics, collisions, speed limits, network ownership and available parts still
+determine how closely the real debris follows those targets. Numeric geometry
+properties preserve full precision; Roblox slider controls support up to six
+decimal places. The playback clock follows elapsed time even on slower devices.
 
 ## Run locally
 
@@ -172,6 +194,7 @@ The hosted URLs use the same paths as the local server. See the
 | File or folder | Responsibility |
 | --- | --- |
 | `index.html`, `style.css` | Page structure and the shared editor layout |
+| `mobile-layout.mjs`, `mobile.css` | Responsive workspace navigation, touch targets, safe areas and keyboard layout |
 | `app.mjs` | Project state, layers, property controls, undo/redo and saving |
 | `project-file.mjs` | Portable JSON serialization and project file size validation |
 | `model.mjs` | Project validation and formation sampling |
@@ -205,12 +228,17 @@ node tests/builder_vertices.test.mjs
 node tests/builder_surface.test.mjs
 node tests/builder_arrangement.test.mjs
 node tests/builder_motion.test.mjs
+node tests/builder_touch.test.mjs
+node tests/builder_runtime.test.mjs
 ```
 
 With the optional Playwright setup, run the browser checks:
 
 ```powershell
 node tests/builder_browser.cjs
+node tests/builder_mobile_browser.cjs
+node tests/builder_touch_browser.cjs
+node tests/builder_clock_browser.cjs
 node tests/builder_path_browser.cjs
 node tests/builder_import_browser.cjs
 node tests/builder_project_browser.cjs
@@ -232,3 +260,7 @@ workflow through undo and reopening.
 The model, controls and motion suites also compare generated Lua against browser
 behavior when Lua, LuaJIT or Luau is available; set `LUAU` or `LUAJIT` to its
 executable path if it is not on `PATH`.
+
+The runtime suite uses Lune (`LUNE` or `lune` on `PATH`) to exercise both Roblox
+system variants at several frame rates, including native Vector3 precision,
+moving-core targets, speed limits and static scheduling.

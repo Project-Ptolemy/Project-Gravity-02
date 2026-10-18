@@ -24,6 +24,22 @@ export function exportLua(input) {
   if (!resolveLayers(project, visibleValues).length) throw new Error('Add a visible layer with a positive part weight before exporting.');
   const layerIndices = new Map(layers.map((layer, i) => [layer.id, i + 1]));
   const controls = project.controls.filter(control => layerIndices.has(control.layerId));
+  // Opt animated formations into the engine's per-frame target follower.
+  // Static exports retain ordinary scheduling; a control that can enable
+  // motion counts, so turning a speed slider on does not lose fidelity.
+  const canVary = (layer, property) => {
+    const control = controls.find(item => item.layerId === layer.id && item.property === property);
+    return control ? control.min !== 0 || control.max !== 0 : layer[property] !== 0;
+  };
+  const frameTracking = layers.some(layer => canVary(layer, 'weight') && canVary(layer, 'timeScale') && (
+    ['spin', 'spinX', 'spinZ'].some(property => canVary(layer, property))
+    || canVary(layer, 'pulse') && canVary(layer, 'pulseSpeed')
+    || canVary(layer, 'wave') && canVary(layer, 'waveSpeed')
+    || canVary(layer, 'orbitRadius') && canVary(layer, 'orbitSpeed')
+    || canVary(layer, 'bobAmount') && canVary(layer, 'bobSpeed')
+    || ['partMoveX', 'partMoveY', 'partMoveZ'].some(property => canVary(layer, property)) && canVary(layer, 'partMoveSpeed')
+    || ['path', 'polygon', 'ring', 'line'].includes(layer.type) && canVary(layer, 'flowSpeed')
+  ));
   const data = layers.map(layer => {
     const result = { type: layer.type, visible: layer.visible, fill: layer.fill, position: layer.position, rotation: layer.rotation, scale: layer.scale };
     for (const property of Object.keys(PROPERTY_DEFS)) if (!property.includes('.')) result[property] = layer[property];
@@ -50,7 +66,7 @@ export function exportLua(input) {
     return `    { Type = "Slider", Name = ${luaString(name)}, Key = ${luaString(control.id)}, Min = ${Math.round(control.min * divisor)}, Max = ${Math.round(control.max * divisor)}, Div = ${divisor}, Default = ${control.default}, ExactMax = true, Desc = ${luaString(description)} },`;
   }).join('\n');
   return `-- Project Gravity Shape Builder · ${project.name}
--- In game: shape selector > + Custom shape. Name it, paste this script, and Add & use.
+-- In game: + Custom shape > paste and name > Review shape > Add & use.
 -- Or save as GravityShapes/<your shape name>.lua and restart Project Gravity.
 -- Preview colors and point size do not recolor or resize held parts.
 -- Each held part occupies a sample of the visible layers, by part weight.
@@ -59,8 +75,12 @@ export function exportLua(input) {
 -- Transform order: primitive/flow, Y twist, radial taper, scatter, Y wave,
 -- individual displacement, scale/pulse, X/Y/Z spin, orbit, bob, then position.
 -- Layer time is formation time * timeScale + timeOffset (seconds).
-local M = {}
-local NAME = ${luaString('Shape Builder: ' + project.name)}
+-- Animated exports track every frame; global speed limits still apply.
+-- Static exports keep normal scheduling. Exact targets may cross the core.
+local M = { AlwaysProcess = true, FrameTracking = ${frameTracking} }
+-- Module identity, not the editable project name: copies may run together in
+-- a blend or per-part assignment, each with independent controls and clocks.
+local STATE_KEY = {}
 local BASE = {
 ${data.map(layer => '    (function() return ' + literal(layer) + ' end)(),').join('\n')}
 }
@@ -143,6 +163,19 @@ for _, layer in ipairs(BASE) do
     if layer.type == "path" then layer.geometry = compile_path(layer.geometry) end
 end
 
+local function path_frame(dx, dy, dz)
+    local length = math.sqrt(dx * dx + dy * dy + dz * dz)
+    local tx, ty, tz = dx / length, dy / length, dz / length
+    local ax, ay, az = math.abs(dx), math.abs(dy), math.abs(dz)
+    local nx, ny, nz
+    if az <= ax and az <= ay then nx, ny, nz = ty, -tx, 0
+    elseif ay <= ax then nx, ny, nz = -tz, 0, tx
+    else nx, ny, nz = 0, tz, -ty end
+    local normal = math.sqrt(nx * nx + ny * ny + nz * nz)
+    nx, ny, nz = nx / normal, ny / normal, nz / normal
+    return nx, ny, nz, ty * nz - tz * ny, tz * nx - tx * nz, tx * ny - ty * nx
+end
+
 -- Binary search avoids walking every segment for every held part.
 local function sample_path(geometry, fraction, tube, angle, radial)
     local points = geometry.points
@@ -158,12 +191,7 @@ local function sample_path(geometry, fraction, tube, angle, radial)
     local t = length > 0 and (target - geometry.lengths[low - 1]) / length or 0
     local x, y, z = p[1] + (q[1] - p[1]) * t, p[2] + (q[2] - p[2]) * t, p[3] + (q[3] - p[3]) * t
     if tube > 0 and length > 0 then
-        local tx, ty, tz = (q[1] - p[1]) / length, (q[2] - p[2]) / length, (q[3] - p[3]) / length
-        local nx, ny, nz
-        if math.abs(tz) < 0.9 then nx, ny, nz = ty, -tx, 0 else nx, ny, nz = -tz, 0, tx end
-        local normal_length = math.sqrt(nx * nx + ny * ny + nz * nz)
-        nx, ny, nz = nx / normal_length, ny / normal_length, nz / normal_length
-        local bx, by, bz = ty * nz - tz * ny, tz * nx - tx * nz, tx * ny - ty * nx
+        local nx, ny, nz, bx, by, bz = path_frame(q[1] - p[1], q[2] - p[2], q[3] - p[3])
         local c, s = tube * radial * math.cos(angle), tube * radial * math.sin(angle)
         x, y, z = x + nx * c + bx * s, y + ny * c + by * s, z + nz * c + bz * s
     end
@@ -172,23 +200,13 @@ end
 
 -- Shared vertex offset frames keep active flow continuous through corners
 -- and the closed seam. Linear interpolation stays bounded without singular
--- normalization at reversals; stationary geometry keeps its legacy frames.
+-- normalization at reversals. Static tubes use the same segment frames.
 local function flow_frames(geometry)
     if geometry.flow_frames then return geometry.flow_frames end
     local segments = {}
     for i = 2, #geometry.points do
         local p, q = geometry.points[i - 1], geometry.points[i]
-        local dx, dy, dz = q[1] - p[1], q[2] - p[2], q[3] - p[3]
-        local length = math.sqrt(dx * dx + dy * dy + dz * dz)
-        local tx, ty, tz = dx / length, dy / length, dz / length
-        local ax, ay, az = math.abs(dx), math.abs(dy), math.abs(dz)
-        local nx, ny, nz
-        if az <= ax and az <= ay then nx, ny, nz = ty, -tx, 0
-        elseif ay <= ax then nx, ny, nz = -tz, 0, tx
-        else nx, ny, nz = 0, tz, -ty end
-        local normal = math.sqrt(nx * nx + ny * ny + nz * nz)
-        nx, ny, nz = nx / normal, ny / normal, nz / normal
-        segments[#segments + 1] = {nx, ny, nz, ty * nz - tz * ny, tz * nx - tx * nz, tx * ny - ty * nx}
+        segments[#segments + 1] = {path_frame(q[1] - p[1], q[2] - p[2], q[3] - p[3])}
     end
     local function average(a, b)
         local result = {}
@@ -225,10 +243,18 @@ local function sample_flow_path(geometry, fraction, tube, angle, radial)
     return position[1], position[2], position[3]
 end
 
-local function state(x6)
+local function state(x6, config)
     x6.pre = x6.pre or {}
-    local st = x6.pre[NAME]
-    if not st then st = {}; x6.pre[NAME] = st end
+    local states = x6.pre[STATE_KEY]
+    if not states then
+        states = setmetatable({}, { __mode = "k" })
+        x6.pre[STATE_KEY] = states
+    end
+    -- The main formation and per-part assignments may share this module while
+    -- supplying different settings. Never let one pre-pass overwrite another.
+    local key = type(config) == "table" and config or STATE_KEY
+    local st = states[key]
+    if not st then st = {}; states[key] = st end
     return st
 end
 
@@ -261,7 +287,7 @@ local function resolve_layers(c)
 end
 
 function M.px(t, c, x6, x9, x1)
-    local st = state(x6)
+    local st = state(x6, c)
     -- Natural ordering leaves gaps in IDs after release. Compact real records
     -- once per population change instead of folding two IDs onto one sample.
     if type(x6.a) == "table" and (not st.indices or st.held_count ~= x6.n or st.claim_counter ~= x6.part_id_counter) then
@@ -429,8 +455,8 @@ local function sample(layer, index, count)
 end
 
 function M.f2(p, cen, d, t, c, x1, x6, x9)
-    local st = state(x6)
-    if not st.layers then M.px(t, c, x6, x9, x1) end
+    local st = state(x6, c)
+    if not st.layers or st.time ~= (finite(t) and t or 0) then M.px(t, c, x6, x9, x1) end
     local count = d.slot_n or st.actual_count or x6.n or ${project.parts}
     if not finite(count) or count < 1 then count = ${project.parts} end
     count = math.max(1, math.floor(count))
@@ -455,7 +481,7 @@ end
 -- Actions change only this module's runtime state and bound control values.
 -- Use the shared formation clock; wall time would jump while paused/reversed.
 local function run_action(index, action, c, x6)
-    local st = state(x6)
+    local st = state(x6, c)
     st.animation = st.animation or {}
     if action == "reset" then
         for _, binding in ipairs(BINDINGS) do
@@ -482,7 +508,7 @@ ${panel}
 }
 
 function M.cleanup(x6, x1)
-    if x6.pre then x6.pre[NAME] = nil end
+    if x6.pre then x6.pre[STATE_KEY] = nil end
 end
 
 return M

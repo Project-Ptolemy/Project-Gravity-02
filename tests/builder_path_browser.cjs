@@ -46,6 +46,20 @@ const setNumber = async (locator, value) => { await locator.fill(String(value));
     assert.equal(await page.evaluate(() => window.appliedPath), null);
     assert.deepEqual(await page.evaluate(() => window.sourcePath), original, 'Cancel never mutates source data');
 
+    const precise = { points: [{ x: 0.123456789, y: 0, z: 0 }, { x: 0.987654321, y: 0, z: 0 }], closed: false, smooth: false };
+    await open(page, precise);
+    assert.equal(await coord(page, 'x').inputValue(), '0.987654321', 'Imported coordinates display their full precision');
+    await coord(page, 'x').focus(); await coord(page, 'x').press('Tab');
+    await setNumber(field(page, 'vertex'), 1);
+    await setNumber(coord(page, 'y'), 0.123456789);
+    assert.equal(await coord(page, 'y').inputValue(), '0.123456789', 'Typed coordinates keep precision beyond four decimals');
+    await button(page, 'insert').click();
+    assert.equal(Number(await coord(page, 'x').inputValue()), (precise.points[0].x + precise.points[1].x) / 2, 'Midpoint insertion does not quantize imported geometry');
+    await button(page, 'apply').click();
+    const preciseResult = await page.evaluate(() => window.appliedPath);
+    assert.equal(preciseResult.points[0].y, 0.123456789);
+    assert.equal(preciseResult.points[2].x, precise.points[1].x, 'Focus and Tab leave imported coordinates intact');
+
     await open(page, { points: [], closed: false, smooth: false });
     assert.equal(await button(page, 'apply').isDisabled(), true);
     const box = await page.locator('.path-editor canvas').boundingBox();

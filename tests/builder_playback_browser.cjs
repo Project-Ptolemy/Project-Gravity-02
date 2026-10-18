@@ -197,6 +197,7 @@ Viewport.prototype.setPoints = function(points) {
 
     const mobile = await setup({ viewport: { width: 320, height: 760 }, isMobile: true, hasTouch: true });
     await importProject(mobile, { ...staticPath, name: 'A very long custom formation with flowing paths and moving debris' }); await playing(mobile, true);
+    await mobile.locator('#mobile-navigation [data-panel="preview"]').tap();
     await mobile.waitForFunction(() => document.querySelector('#preview-status').textContent === 'No movement configured');
     await mobile.locator('#motion-hint').scrollIntoViewIfNeeded();
     await noOverflow(mobile);
@@ -223,6 +224,7 @@ Viewport.prototype.setPoints = function(points) {
     await edit(mobile, 'flowSpeed', 12);
     await mobile.locator('#toggle-part-tracker').click();
     assert.equal(await mobile.locator('#toggle-part-tracker').getAttribute('aria-pressed'), 'true');
+    await mobile.locator('#mobile-navigation [data-panel="preview"]').tap();
     await mobile.locator('.site-navigation a').filter({ hasText: 'Plugin guide' }).click();
     await mobile.waitForURL(base + '/docs/plugins/');
     await mobile.goBack();

@@ -2789,11 +2789,11 @@ return function(context)
 			local custom = Instance.new("TextButton", dlst_container)
 			custom.Name = "CustomShapeEntry"
 			custom.Position = UDim2.new(0, 10, 0, 52)
-			custom.Size = UDim2.new(1, -20, 0, 38)
+			custom.Size = UDim2.new(1, -20, 0, 48)
 			custom.BackgroundColor3 = Color3.fromRGB(47, 49, 113)
 			custom.TextColor3 = Color3.fromRGB(245, 245, 250)
 			custom.Font = Enum.Font.GothamBold
-			custom.TextSize = 13
+			custom.TextSize = 14
 			custom.Text = "+ Custom shape"
 			Instance.new("UICorner", custom).CornerRadius = UDim.new(0, 6)
 			local editor, loading
@@ -2827,8 +2827,8 @@ return function(context)
 
 		local dlst = Instance.new("ScrollingFrame", dlst_container)
 		dlst.BackgroundTransparency = 1
-		dlst.Position = UDim2.new(0, 0, 0, 100)
-		dlst.Size = UDim2.new(1, 0, 1, -110)
+		dlst.Position = UDim2.new(0, 0, 0, 110)
+		dlst.Size = UDim2.new(1, 0, 1, -120)
 		dlst.ScrollBarThickness = 0
 		dlst.AutomaticCanvasSize = Enum.AutomaticSize.Y
 		dlst.CanvasSize = UDim2.new(0, 0, 0, 0)

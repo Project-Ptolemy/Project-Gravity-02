@@ -8,7 +8,7 @@ import {
   sampleProject, getProperty, controlDivisor,
 } from '../docs/plugins/builder/model.mjs';
 import { exportLua, luaString } from '../docs/plugins/builder/exporter.mjs';
-import { compilePath, flattenPath, samplePath } from '../docs/plugins/builder/geometry/path.mjs';
+import { compilePath, flattenPath, samplePath, pathFrame } from '../docs/plugins/builder/geometry/path.mjs';
 
 const projectOf = (layers, overrides = {}) => ({ version: 1, name: 'Test shape', parts: 120, pointSize: 1.5, layers, controls: [], ...overrides });
 const near = (a, b, tolerance = 1e-8) => assert.ok(Math.abs(a - b) <= tolerance, `${a} ≈ ${b}`);
@@ -108,6 +108,18 @@ for (const type of LAYER_TYPES) {
       const last = points.at(-1);
       near(last.x * end.x + last.y * end.y + last.z * end.z, 2500);
     }
+  }
+}
+{
+  // Normalization can round a tangent to either side of 0.9 across runtimes.
+  // A frame must be orthonormal regardless of scale or axis ties, and use the
+  // same branch in JavaScript and Lua. These formerly turned entire tubes.
+  for (const delta of [[0.005, 0, 0.010323708024175277], [1, 1, 1], [0, 0, 50], [50, 0, 0], [0, 50, 0], [3000, -4000, 5000]]) {
+    const [nx, ny, nz, bx, by, bz] = pathFrame(...delta);
+    near(Math.hypot(nx, ny, nz), 1); near(Math.hypot(bx, by, bz), 1);
+    near(nx * bx + ny * by + nz * bz, 0);
+    near(nx * delta[0] + ny * delta[1] + nz * delta[2], 0);
+    near(bx * delta[0] + by * delta[1] + bz * delta[2], 0);
   }
 }
 {
@@ -436,7 +448,7 @@ assert.equal(Object.prototype.polluted, undefined);
 const nastyName = '"; error(\'injected\'); -- ]=] 🪐';
 const nasty = { ...controlled, name: nastyName, controls: [{ ...controlled.controls[0], name: nastyName }] };
 const source = exportLua(nasty);
-assert.ok(source.includes('local NAME = ' + luaString('Shape Builder: ' + nastyName)));
+assert.ok(source.includes('local STATE_KEY = {}'));
 assert.ok(source.includes('Div = 10, Default = 20, ExactMax = true'));
 assert.ok(source.includes('Min = 50, Max = 400'));
 assert.ok(source.includes('d.slot_n or st.actual_count or x6.n'));
@@ -458,6 +470,12 @@ const executable = executables.find(candidate => !spawnSync(candidate, ['-v'], {
 if (executable) {
   const cases = [];
   const nodes = [{ x: -20, y: 9, z: 0 }, { x: -10, y: 9, z: 0 }, { x: 10, y: -7, z: 40 }, { x: 10, y: -7, z: 40 }, { x: 18, y: 22, z: 40 }];
+  for (const end of [{ x: 0.005, y: 0, z: 0.010323708024175277 }, { x: 1, y: 1, z: 1 }, { x: 0.05, y: 0.1, z: 0.4 }]) {
+    for (const flowSpeed of [0, 0.1, -0.1]) for (const fill of [false, true]) {
+      const layer = originLayer('path', { path: { points: [{ x: 0, y: 0, z: 0 }, end] }, tube: 4, flowSpeed, fill });
+      cases.push({ project: projectOf([layer], { parts: 19 }), time: 0.1, values: {} });
+    }
+  }
   const largePath = originLayer('path', { path: { points: Array.from({ length: 4096 }, (_, i) => ({ x: i, y: Math.sin(i) * 17, z: Math.cos(i) * 13 })), closed: true, smooth: true } });
   cases.push({ project: projectOf([largePath], { parts: 17 }), time: 0, values: {} });
   cases.push({ project: projectOf([originLayer('path', { path: { points: Array.from({ length: 3 }, () => ({ x: 0.1, y: 0.2, z: 0.3 })), smooth: true, closed: true }, tube: 4 })], { parts: 7 }), time: 0, values: {} });
@@ -572,10 +590,46 @@ end
     const luaExpected = '{' + expected.map(point => `{${point.x},${point.y},${point.z}}`).join(',') + '}';
     return `check(${luaString(exportLua(project))}, ${project.parts}, ${time}, ${luaValues}, ${luaExpected})`;
   }).join('\n');
+  const concurrent = { ...controlled, parts: 9, layers: [{ ...controlledLayer, spin: 37, wave: 3, waveSpeed: 0.4 }] };
+  const expectedLua = (time, values) => '{' + sampleProject(concurrent, time, values).map(point => `{${point.x},${point.y},${point.z}}`).join(',') + '}';
+  const isolation = `
+do
+    local source = ${luaString(exportLua(concurrent))}
+    local first, second = assert(compile(source))(), assert(compile(source))()
+    local ca, cb, x6 = {radius=13,lift=3}, {radius=31,lift=-7}, {n=9,pre={unrelated=true}}
+    local function verify(module, c, t, expected)
+        for i, point in ipairs(expected) do
+            local _, target = module.f2(p, cen, {id=i,slot=i,slot_n=9}, t, c, x1, x6, x9)
+            near(target.X, point[1]+cen.X, "independent context x")
+            near(target.Y, point[2]+cen.Y, "independent context y")
+            near(target.Z, point[3]+cen.Z, "independent context z")
+        end
+    end
+    -- Identical saved names and identical source must still have independent
+    -- caches when separate plugin copies participate in a shape blend.
+    first.px(7.5,ca,x6,x9,x1); second.px(7.5,cb,x6,x9,x1)
+    verify(first,ca,7.5,${expectedLua(7.5, { radius: 13, lift: 3 })})
+    verify(second,cb,7.5,${expectedLua(7.5, { radius: 31, lift: -7 })})
+    -- One loaded module can also receive distinct main/per-part configs.
+    first.px(7.5,cb,x6,x9,x1)
+    verify(first,ca,7.5,${expectedLua(7.5, { radius: 13, lift: 3 })})
+    verify(first,cb,7.5,${expectedLua(7.5, { radius: 31, lift: -7 })})
+    -- A per-part config not included in the shared pre-pass still advances.
+    first.px(8.25,ca,x6,x9,x1)
+    verify(first,cb,8.25,${expectedLua(8.25, { radius: 31, lift: -7 })})
+    local function entries() local n=0;for _ in pairs(x6.pre) do n=n+1 end;return n end
+    assert(entries()==3,"same-name modules must own separate runtime state")
+    first.cleanup(x6,x1)
+    assert(entries()==2 and x6.pre.unrelated,"cleanup crossed module boundaries")
+    verify(second,cb,7.5,${expectedLua(7.5, { radius: 31, lift: -7 })})
+    second.cleanup(x6,x1)
+    assert(entries()==1 and x6.pre.unrelated,"cleanup left module contexts behind")
+end
+`;
   const dir = mkdtempSync(join(tmpdir(), 'gravity-builder-test-'));
   try {
     const file = join(dir, 'builder-parity.lua');
-    writeFileSync(file, header + suite + '\nprint("Exported Lua: browser geometry, controls, runtime slots and lifecycle parity passed.")\n');
+    writeFileSync(file, header + suite + isolation + '\nprint("Exported Lua: browser geometry, controls, runtime slots, independent contexts and lifecycle parity passed.")\n');
     const result = spawnSync(executable, [file], { encoding: 'utf8', maxBuffer: 8 * 1024 * 1024 });
     assert.equal(result.status, 0, result.stdout + result.stderr);
     process.stdout.write(result.stdout);

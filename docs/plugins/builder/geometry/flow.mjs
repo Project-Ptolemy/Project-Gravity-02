@@ -1,3 +1,5 @@
+import { pathFrame } from './path.mjs';
+
 // Flow changes path position, never the original slot's individual phase.
 // Tiny collapsed outlines stay still rather than dividing by a near-zero size.
 export function flowFraction(base, speed, time, length, closed) {
@@ -24,18 +26,7 @@ function offsetFrames(table, closed) {
   for (let index = 1; index < table.points.length; index++) {
     const p = table.points[index - 1], q = table.points[index];
     const dx = q.x - p.x, dy = q.y - p.y, dz = q.z - p.z;
-    const length = Math.hypot(dx, dy, dz);
-    const tx = dx / length, ty = dy / length, tz = dz / length;
-    // Choose from raw components: hypot and Lua sqrt can round a normalized
-    // tangent to opposite sides of a threshold such as abs(tz) < 0.9.
-    const ax = Math.abs(dx), ay = Math.abs(dy), az = Math.abs(dz);
-    let nx, ny, nz;
-    if (az <= ax && az <= ay) [nx, ny, nz] = [ty, -tx, 0];
-    else if (ay <= ax) [nx, ny, nz] = [-tz, 0, tx];
-    else [nx, ny, nz] = [0, tz, -ty];
-    const normal = Math.hypot(nx, ny, nz);
-    nx /= normal; ny /= normal; nz /= normal;
-    segmentFrames.push([nx, ny, nz, ty * nz - tz * ny, tz * nx - tx * nz, tx * ny - ty * nx]);
+    segmentFrames.push(pathFrame(dx, dy, dz));
   }
   const first = closed ? average(segmentFrames.at(-1), segmentFrames[0]) : segmentFrames[0];
   const values = [first];

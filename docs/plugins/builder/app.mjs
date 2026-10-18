@@ -6,12 +6,13 @@ import { openSourceEditor } from './editors/source-editor.mjs';
 import { openSurfaceEditor } from './editors/surface-editor.mjs';
 import { openRepeatEditor } from './editors/repeat-editor.mjs';
 import { readProjectFile, serializeProject } from './project-file.mjs';
+import { createMobileLayout } from './mobile-layout.mjs';
 
 const $ = id => document.getElementById(id);
 const escapeHTML = value => String(value).replace(/[&<>"']/g, character => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[character]);
 const clone = value => JSON.parse(JSON.stringify(value));
 const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
-const format = value => Number(Number(value).toFixed(6)).toString();
+const format = value => String(Number(value));
 const titleCase = value => value.charAt(0).toUpperCase() + value.slice(1);
 const controlType = control => control.type || 'slider';
 const ACTION_LABELS = { restart: 'Restart animation', reverse: 'Reverse animation', reset: 'Reset controls' };
@@ -71,7 +72,7 @@ let playing = !matchMedia('(prefers-reduced-motion: reduce)').matches;
 let speed = 1;
 let dirty = true;
 let activeTab = 'properties';
-let grid = true, axes = true, core = true, moveLayers = true, trackPart = false;
+let grid = true, axes = true, core = true, moveLayers = !matchMedia('(pointer: coarse)').matches, trackPart = false;
 let dragSession = null;
 let editingControl = null;
 let suggestedControlName = '';
@@ -88,6 +89,7 @@ const viewport = new Viewport($('viewport'), {
   onMove: moveLayerDrag,
   onMoveEnd: finishLayerDrag,
 });
+const mobileLayout = createMobileLayout(setTab);
 const selectedLayer = () => project.layers.find(layer => layer.id === selectedId);
 function currentPosition(layer) {
   return Object.fromEntries(['x', 'y', 'z'].map(axis => {
@@ -106,9 +108,10 @@ function setLayerFlag(layer, property, value) {
   if (control) { control.default = value; delete previewValues[control.id]; }
 }
 function setLayerValue(layer, property, proposed) {
-  const limits = propertyConfig(property, layer), value = Number(clamp(property === 'sides' ? Math.round(proposed) : proposed, limits.min, limits.max).toFixed(6));
-  setProperty(layer, property, value);
   const control = project.controls.find(control => control.layerId === layer.id && control.property === property);
+  const limits = propertyConfig(property, layer), bounded = clamp(property === 'sides' ? Math.round(proposed) : proposed, limits.min, limits.max);
+  const value = control ? Number(bounded.toFixed(6)) : bounded;
+  setProperty(layer, property, value);
   if (control) { control.default = value; delete previewValues[control.id]; }
 }
 function beginLayerDrag(layerId) {
@@ -185,7 +188,7 @@ function renderLayers() {
   $('visible-count').textContent = `${project.layers.filter(layer => layer.visible).length} visible`;
   const scrollTop = $('layers').scrollTop;
   const filtered = project.layers.filter(layer => `${layer.name} ${layer.type}`.toLowerCase().includes(layerFilter));
-  $('layers').innerHTML = filtered.map(layer => `<div class="layer-row ${layer.id === selectedId ? 'selected' : ''} ${layer.visible ? '' : 'invisible'}" data-layer="${escapeHTML(layer.id)}" role="listitem" draggable="true" style="--layer-color:${layer.color}"><button class="layer-select" aria-pressed="${layer.id === selectedId}" title="Select ${escapeHTML(layer.name)}; drag to reorder"><span class="layer-symbol">${icon(layer.type)}</span><span class="layer-name">${escapeHTML(layer.name)}</span></button><button class="icon-button layer-visibility" aria-label="${layer.visible ? 'Hide' : 'Show'} ${escapeHTML(layer.name)}" aria-pressed="${layer.visible}" title="${layer.visible ? 'Hide' : 'Show'} layer">${icon(layer.visible ? 'eye' : 'eye-off')}</button></div>`).join('') || `<p class="layers-empty">${project.layers.length ? 'No layers match your search.' : 'Your next idea belongs here.'}</p>`;
+  $('layers').innerHTML = filtered.map(layer => `<div class="layer-row ${layer.id === selectedId ? 'selected' : ''} ${layer.visible ? '' : 'invisible'}" data-layer="${escapeHTML(layer.id)}" role="listitem" draggable="true" style="--layer-color:${layer.color}"><button class="layer-select" aria-pressed="${layer.id === selectedId}" title="Select ${escapeHTML(layer.name)}; drag to reorder"><span class="layer-symbol">${icon(layer.type)}</span><span class="layer-name">${escapeHTML(layer.name)}</span></button><button class="layer-edit quiet-button" aria-label="Edit ${escapeHTML(layer.name)}">Edit</button><button class="icon-button layer-visibility" aria-label="${layer.visible ? 'Hide' : 'Show'} ${escapeHTML(layer.name)}" aria-pressed="${layer.visible}" title="${layer.visible ? 'Hide' : 'Show'} layer">${icon(layer.visible ? 'eye' : 'eye-off')}</button></div>`).join('') || `<p class="layers-empty">${project.layers.length ? 'No layers match your search.' : 'Your next idea belongs here.'}</p>`;
   $('layers').scrollTop = scrollTop;
   $('duplicate').disabled = !selectedLayer() || project.layers.length >= 64;
   $('repeat-layer').disabled = !selectedLayer() || project.layers.length >= 64;
@@ -300,6 +303,7 @@ function setTab(tab) {
   activeTab = tab;
   for (const name of ['properties', 'controls']) { const active = tab === name; $(`${name}-tab`).classList.toggle('active', active); $(`${name}-tab`).setAttribute('aria-selected', active); $(`${name}-panel`).hidden = !active; }
   if (tab === 'controls') renderControls();
+  if (mobileLayout.active) mobileLayout.show(tab);
 }
 function addLayer(type) {
   if (type === 'path') { drawPath(); return; }
@@ -404,13 +408,14 @@ function loadPreset(preset) {
 function bindProperty(input) {
   const layer = selectedLayer(), property = input.dataset.prop;
   if (!layer || input.value === '' || !Number.isFinite(Number(input.value))) return;
-  const config = propertyConfig(property, layer), value = Number(clamp(property === 'sides' ? Math.round(Number(input.value)) : Number(input.value), config.min, config.max).toFixed(6));
+  const config = propertyConfig(property, layer), value = clamp(property === 'sides' ? Math.round(Number(input.value)) : Number(input.value), config.min, config.max);
   mutate(() => setLayerValue(layer, property, value), layer.id + property);
+  const actual = fieldValue(layer, property);
   syncAnchor();
   $('properties-panel').querySelectorAll('[data-prop]').forEach(sibling => {
     if (sibling.dataset.prop !== property || sibling === input) return;
     if (sibling.type === 'range') { if (value > Number(sibling.max)) sibling.max = value; if (value < Number(sibling.min)) sibling.min = value; }
-    sibling.value = format(value);
+    sibling.value = format(actual);
   });
 }
 function openControl(property = null, id = null, requestedType = 'slider') {
@@ -463,7 +468,7 @@ function setControlDefaults() {
   if (!$('control-name').value || $('control-name').value === suggestedControlName) $('control-name').value = `${layer.name} ${label.toLowerCase()}`.slice(0, 48);
   suggestedControlName = `${layer.name} ${label.toLowerCase()}`.slice(0, 48);
   if (type === 'button') return;
-  const value = fieldValue(layer, property);
+  const value = type === 'slider' ? Number(fieldValue(layer, property).toFixed(6)) : fieldValue(layer, property);
   if (type === 'toggle') { $('control-toggle-default').checked = Boolean(value); return; }
   const config = PROPERTY_DEFS[property];
   $('control-min').value = config.min < 0 ? Math.max(config.min, Math.min(-90, value)) : config.min;
@@ -502,14 +507,23 @@ function saveProject() { download(serializeProject(project), safeFilename() + '.
 function showExport() {
   try {
     $('export-code').value = exportLua(project);
+    $('export-copy-status').textContent = '';
+    $('export-source').open = false;
     const layers = project.layers.filter(layer => layer.visible || project.controls.some(control => control.layerId === layer.id && control.type === 'toggle' && control.property === 'visible')), controls = project.controls.filter(control => layers.some(layer => layer.id === control.layerId));
     $('export-summary').textContent = `${project.name} · ${layers.length} layers · ${controls.length} controls`;
     $('export-dialog').showModal();
   } catch (error) { toast(error.message); }
 }
 async function copyLua() {
-  try { await navigator.clipboard.writeText($('export-code').value); toast('Lua plugin copied to clipboard.'); }
-  catch { $('export-code').focus(); $('export-code').select(); try { if (document.execCommand('copy')) { toast('Lua plugin copied to clipboard.'); return; } } catch {} toast('Select and copy the highlighted Lua, or download the plugin.'); }
+  const success = () => { $('export-copy-status').textContent = 'Copied. Open + Custom shape in Roblox and paste your script.'; toast('Lua plugin copied to clipboard.'); };
+  try { await navigator.clipboard.writeText($('export-code').value); success(); }
+  catch {
+    $('export-source').open = true;
+    $('export-code').focus(); $('export-code').select();
+    $('export-code').setSelectionRange(0, $('export-code').value.length);
+    try { if (document.execCommand('copy')) { success(); return; } } catch {}
+    $('export-copy-status').textContent = 'Copy the selected script using your device’s Copy command, or download the Lua file.';
+  }
 }
 function hasMotion(layer) {
   return layer.spin || layer.spinX || layer.spinZ ||
@@ -532,6 +546,8 @@ function updateMotionStatus() {
   if ($('motion-hint-text').textContent !== hint) $('motion-hint-text').textContent = hint;
 }
 function updatePlayback() {
+  lastFrame = performance.now();
+  $('preview-time').value = format(time);
   $('play-pause').innerHTML = icon(playing ? 'pause' : 'play');
   $('play-pause').setAttribute('aria-label', playing ? 'Pause animation' : 'Play animation');
   updateMotionStatus();
@@ -542,7 +558,7 @@ $('layers').addEventListener('click', event => {
   const row = event.target.closest('[data-layer]'); if (!row) return;
   const layer = project.layers.find(layer => layer.id === row.dataset.layer);
   if (event.target.closest('.layer-visibility')) { soloState = null; mutate(() => { setLayerFlag(layer, 'visible', !layer.visible); }); renderLayers(); renderControls(); }
-  else { selectedId = layer.id; renderLayers(); renderProperties(); }
+  else { selectedId = layer.id; renderLayers(); renderProperties(); if (event.target.closest('.layer-edit')) setTab('properties'); }
 });
 $('layer-search').addEventListener('input', () => { layerFilter = $('layer-search').value.trim().toLowerCase(); renderLayers(); });
 $('layers').addEventListener('dragstart', event => {
@@ -678,7 +694,9 @@ $('configure-movement').onclick = () => {
   section.scrollIntoView({ block: 'nearest' });
   section.querySelector('summary').focus({ preventScroll: true });
 };
-$('restart').onclick = () => { time = 0; dirty = true; };
+$('zoom-in').onclick = () => viewport.zoomBy(1.25);
+$('zoom-out').onclick = () => viewport.zoomBy(0.8);
+$('restart').onclick = () => { time = 0; dirty = true; updatePlayback(); };
 $('preview-time').onchange = () => { const value = Number($('preview-time').value); if ($('preview-time').value !== '' && Number.isFinite(value)) { time = clamp(value, -3600, 3600); playing = false; dirty = true; updatePlayback(); } $('preview-time').value = format(time); };
 for (const [id, amount] of [['frame-back', -1], ['frame-forward', 1]]) $(id).onclick = () => { playing = false; time += amount / 60; dirty = true; updatePlayback(); };
 $('playback-speed').onchange = () => { speed = Number($('playback-speed').value); };
@@ -722,9 +740,24 @@ document.addEventListener('visibilitychange', () => { if (document.hidden) persi
 window.addEventListener('pagehide', persist);
 
 let lastFrame = performance.now(), lastTimeLabel = -1, lastPointCount = -1;
+let dialogPaused = Boolean(document.querySelector('dialog[open]'));
+// Dialogs also pause between delivered frames on a busy phone. Reset at the
+// actual transition so time spent importing or copying cannot become motion.
+new MutationObserver(() => {
+  const paused = Boolean(document.querySelector('dialog[open]'));
+  if (paused === dialogPaused) return;
+  const now = performance.now();
+  if (!dialogPaused && playing && !document.hidden) {
+    time += Math.max(0, (now - lastFrame) / 1000) * speed;
+    dirty = true;
+  }
+  dialogPaused = paused;
+  lastFrame = now;
+}).observe(document.body, { subtree: true, attributes: true, attributeFilter: ['open'] });
+document.addEventListener('visibilitychange', () => { lastFrame = performance.now(); });
 function frame(now) {
-  const delta = Math.min((now - lastFrame) / 1000, 0.06); lastFrame = now;
-  if (playing && !document.hidden && !document.querySelector('dialog[open]')) { time += delta * speed; dirty = true; }
+  const delta = Math.max(0, (now - lastFrame) / 1000); lastFrame = now;
+  if (playing && !document.hidden && !dialogPaused) { time += delta * speed; dirty = true; }
   if (dirty) {
     const points = sampleProject(project, time, previewValues); viewport.setPoints(points);
     if (lastPointCount !== points.length) { $('point-count').textContent = `${points.length.toLocaleString()} parts`; $('empty-scene').hidden = points.length > 0; lastPointCount = points.length; }
@@ -743,6 +776,8 @@ function frame(now) {
   viewport.render(); requestAnimationFrame(frame);
 }
 renderAll(); updatePlayback();
+$('toggle-move').classList.toggle('active', moveLayers);
+$('toggle-move').setAttribute('aria-pressed', moveLayers);
 viewport.setPoints(sampleProject(project, 0));
 // Give the first scene comfortable breathing room between the editor overlays.
 requestAnimationFrame(() => { viewport.fit(); requestAnimationFrame(frame); });

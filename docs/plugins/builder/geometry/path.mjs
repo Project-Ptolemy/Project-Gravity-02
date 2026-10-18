@@ -6,6 +6,27 @@ const cache = new Map();
 let cachedPoints = 0;
 const copy = point => ({ x: point.x, y: point.y, z: point.z });
 
+// Match the exported Lua evaluation order. Coordinates are bounded to 5,000
+// studs, so a direct square root is safe; hypot's different rounding can pick
+// the other segment at an exact corner and displace a tube by several studs.
+export const vectorLength = (x, y, z) => Math.sqrt(x * x + y * y + z * z);
+
+// Cross with the least-aligned coordinate axis. Select from the raw deltas,
+// never from a normalized tangent near a floating-point branch threshold.
+// Both stationary and flowing tubes use this same right-handed frame.
+export function pathFrame(dx, dy, dz) {
+  const length = vectorLength(dx, dy, dz);
+  const tx = dx / length, ty = dy / length, tz = dz / length;
+  const ax = Math.abs(dx), ay = Math.abs(dy), az = Math.abs(dz);
+  let nx, ny, nz;
+  if (az <= ax && az <= ay) [nx, ny, nz] = [ty, -tx, 0];
+  else if (ay <= ax) [nx, ny, nz] = [-tz, 0, tx];
+  else [nx, ny, nz] = [0, tz, -ty];
+  const normal = vectorLength(nx, ny, nz);
+  nx /= normal; ny /= normal; nz /= normal;
+  return [nx, ny, nz, ty * nz - tz * ny, tz * nx - tx * nz, tx * ny - ty * nx];
+}
+
 export function flattenPath(path) {
   const points = path.points;
   if (!points.length) return [];
@@ -50,7 +71,7 @@ export function compilePath(path) {
   let total = 0;
   for (const point of flattened) {
     const last = points[points.length - 1];
-    const length = last ? Math.hypot(point.x - last.x, point.y - last.y, point.z - last.z) : 0;
+    const length = last ? vectorLength(point.x - last.x, point.y - last.y, point.z - last.z) : 0;
     if (last && length === 0) continue;
     total += length; points.push(point); lengths.push(total);
   }
@@ -78,14 +99,7 @@ export function samplePath(table, fraction, tube = 0, angle = 0, radial = 1) {
   const t = length > 0 ? (target - table.lengths[low - 1]) / length : 0;
   const point = { x: p.x + (q.x - p.x) * t, y: p.y + (q.y - p.y) * t, z: p.z + (q.z - p.z) * t };
   if (tube > 0 && length > 0) {
-    const tx = (q.x - p.x) / length, ty = (q.y - p.y) / length, tz = (q.z - p.z) / length;
-    // A stable perpendicular frame works for paths in every drawing plane.
-    let nx = Math.abs(tz) < 0.9 ? ty : -tz;
-    let ny = Math.abs(tz) < 0.9 ? -tx : 0;
-    let nz = Math.abs(tz) < 0.9 ? 0 : tx;
-    const normalLength = Math.hypot(nx, ny, nz);
-    nx /= normalLength; ny /= normalLength; nz /= normalLength;
-    const bx = ty * nz - tz * ny, by = tz * nx - tx * nz, bz = tx * ny - ty * nx;
+    const [nx, ny, nz, bx, by, bz] = pathFrame(q.x - p.x, q.y - p.y, q.z - p.z);
     const c = tube * radial * Math.cos(angle), s = tube * radial * Math.sin(angle);
     point.x += nx * c + bx * s; point.y += ny * c + by * s; point.z += nz * c + bz * s;
   }

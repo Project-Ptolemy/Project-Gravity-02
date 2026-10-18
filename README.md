@@ -148,9 +148,11 @@ See [hosting details](docs/PLUGINS.md#publish-the-website).
 
 Use **Export → Copy Lua**, then open Project Gravity's in-game shape selector and
 choose **+ Custom shape**. Enter a name, paste the complete script, and click
-**Add & use**. This works on desktop and mobile, including compatible Lua shape
-scripts from other sources. **Check** validates the Lua syntax and module structure
-before adding it. Existing shape names cannot be overwritten.
+**Review shape** to check the module and inspect its name, controls and storage
+information. Choose **Add & use** to import and select it, or **Back** to keep editing.
+This works on desktop and mobile, including compatible Lua shape scripts from
+other sources. Closing the editor keeps your draft for this session. Existing
+shape names cannot be overwritten.
 
 Imports appear in the shape list immediately. When your executor supports local
 file storage, the script is saved to `GravityShapes/<name>.lua` for future sessions;

@@ -61,6 +61,14 @@ export class Viewport {
 
   get zoom() { return Math.round(DEFAULT_DISTANCE / this.distance * 100); }
 
+  /** Accessible camera buttons use the same bounded zoom as wheel and touch. */
+  zoomBy(factor) {
+    if (!Number.isFinite(factor) || factor <= 0) return;
+    this._cancelPointers();
+    this._zoomAt(factor);
+    this._cameraChanged();
+  }
+
   setPoints(points) {
     this.points = Array.isArray(points) ? points : [];
     this._dirty = true;
@@ -254,6 +262,7 @@ export class Viewport {
 
   _resize() {
     const bounds = this.canvas.getBoundingClientRect();
+    if (bounds.width !== this.width || bounds.height !== this.height) this._cancelPointers();
     this.width = Math.max(1, bounds.width);
     this.height = Math.max(1, bounds.height);
     this.dpr = Math.min(2, window.devicePixelRatio || 1);
@@ -511,10 +520,10 @@ export class Viewport {
     ctx.textBaseline = 'alphabetic';
   }
 
-  _hitGizmo(x, y) {
+  _hitGizmo(x, y, radius = 9) {
     if (!this.options.move) return null;
-    if (this._gizmoCenter && Math.hypot(x - this._gizmoCenter.x, y - this._gizmoCenter.y) <= 9) return 'plane';
-    let nearest = 9, hit = null;
+    if (this._gizmoCenter && Math.hypot(x - this._gizmoCenter.x, y - this._gizmoCenter.y) <= radius) return 'plane';
+    let nearest = radius, hit = null;
     for (const { axis, start, end, screenLength } of this._gizmoHandles) {
       const dx = (end.x - start.x) / screenLength, dy = (end.y - start.y) / screenLength;
       const along = (x - start.x) * dx + (y - start.y) * dy;
@@ -525,7 +534,7 @@ export class Viewport {
     return hit;
   }
 
-  _pick(x, y) {
+  _pick(x, y, radius = 7) {
     let nearest = null, nearestDistance = Infinity;
     for (let index = this._projected.length - 1; index >= 0; index--) {
       const item = this._projected[index];
@@ -533,7 +542,7 @@ export class Viewport {
       const size = this._pointSize(item), half = size / 2;
       if (dx <= half && dy <= (size < 2 ? half : half - dx / 2)) return item;
       const distance = Math.hypot(dx, dy);
-      if (distance <= Math.max(7, half + 3) && distance < nearestDistance) { nearest = item; nearestDistance = distance; }
+      if (distance <= Math.max(radius, half + 3) && distance < nearestDistance) { nearest = item; nearestDistance = distance; }
     }
     return nearest;
   }
@@ -764,25 +773,26 @@ export class Viewport {
     const pointer = {
       x: event.clientX, y: event.clientY, startX: event.clientX, startY: event.clientY,
       moved: false, pan: event.button !== 0 || event.shiftKey, selectionHandled: false,
+      touch: event.pointerType === 'touch', gesture: false,
     };
     this._pointers.set(event.pointerId, pointer);
     this.canvas.setPointerCapture(event.pointerId);
     this.canvas.style.cursor = 'grabbing';
     if (this._pointers.size > 1) {
       this._finishMove(true);
-      for (const active of this._pointers.values()) active.moved = true;
+      for (const active of this._pointers.values()) { active.moved = true; active.gesture = true; }
       return;
     }
     if (!pointer.pan) {
       this.render();
       const rect = this.canvas.getBoundingClientRect();
       const x = event.clientX - rect.left, y = event.clientY - rect.top;
-      const axis = this._hitGizmo(x, y);
+      const axis = this._hitGizmo(x, y, pointer.touch ? 22 : 9);
       if (axis && this.anchor && this.selected !== null) {
         pointer.selectionHandled = true;
         this._beginMove(event.pointerId, this.selected, axis, this.anchor, x, y);
       } else {
-        const hit = this._pick(x, y);
+        const hit = this._pick(x, y, pointer.touch ? 22 : 7);
         if (hit) {
           pointer.selectionHandled = true;
           this.setSelected(hit.point.layerId);
@@ -807,7 +817,7 @@ export class Viewport {
     const dx = event.clientX - pointer.x;
     const dy = event.clientY - pointer.y;
     if (this._moveDrag?.pointerId === event.pointerId) {
-      if (this._moveDrag.started || Math.hypot(event.clientX - pointer.startX, event.clientY - pointer.startY) > 3) {
+      if (this._moveDrag.started || Math.hypot(event.clientX - pointer.startX, event.clientY - pointer.startY) > (pointer.touch ? 8 : 3)) {
         pointer.moved = true;
         this._updateMove(event.clientX, event.clientY);
       }
@@ -815,17 +825,25 @@ export class Viewport {
       pointer.y = event.clientY;
       return;
     }
-    if (this._pointers.size === 2) {
-      const other = [...this._pointers.entries()].find(([id]) => id !== event.pointerId)?.[1];
+    if (this._pointers.size >= 2) {
+      // Only the first pair controls the camera; resting another finger must
+      // not turn a pinch into an orbit or restart geometry movement.
+      const pair = [...this._pointers.entries()].slice(0, 2);
+      const other = pair.some(([id]) => id === event.pointerId)
+        ? pair.find(([id]) => id !== event.pointerId)?.[1] : null;
       if (other) {
         const previous = Math.hypot(pointer.x - other.x, pointer.y - other.y);
         const next = Math.hypot(event.clientX - other.x, event.clientY - other.y);
-        if (previous > 5 && next > 5) this.distance = clamp(this.distance * previous / next, 8, MAX_DISTANCE);
+        const rect = this.canvas.getBoundingClientRect();
+        if (previous > 5 && next > 5) this._zoomAt(next / previous,
+          (pointer.x + other.x) / 2 - rect.left, (pointer.y + other.y) / 2 - rect.top);
         this._pan(dx * 0.5, dy * 0.5);
       }
       pointer.moved = true;
-    } else {
-      if (Math.hypot(event.clientX - pointer.startX, event.clientY - pointer.startY) > 4) pointer.moved = true;
+    } else if (!pointer.gesture) {
+      // Once one finger lifts from a pinch, wait for the whole gesture to end.
+      // A trailing finger must not unexpectedly orbit or select a layer.
+      if (Math.hypot(event.clientX - pointer.startX, event.clientY - pointer.startY) > (pointer.touch ? 8 : 4)) pointer.moved = true;
       if (pointer.moved) {
         if (pointer.pan || event.shiftKey) this._pan(dx, dy);
         else {
@@ -846,6 +864,16 @@ export class Viewport {
     this.target.x += (-dx * this._right.x + dy * this._up.x) * scale;
     this.target.y += dy * this._up.y * scale;
     this.target.z += (-dx * this._right.z + dy * this._up.z) * scale;
+  }
+
+  _zoomAt(factor, x = this.width / 2, y = this.height / 2) {
+    const ray = this._pointerRay(x, y);
+    const before = this._planeIntersection(ray, this.target, this._outward);
+    this.distance = clamp(this.distance / factor, 8, MAX_DISTANCE);
+    const after = this._planeIntersection(this._pointerRay(x, y), this.target, this._outward);
+    if (before && after) {
+      for (const axis of ['x', 'y', 'z']) this.target[axis] += before[axis] - after[axis];
+    }
   }
 
   _beginMove(pointerId, layerId, axis, point, x, y) {
@@ -935,9 +963,10 @@ export class Viewport {
 
   _wheel(event) {
     event.preventDefault();
-    if (this._moveDrag) return;
+    if (this._pointers.size) return;
     const delta = event.deltaY * (event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? this.height : 1);
-    this.distance = clamp(this.distance * Math.exp(clamp(delta * 0.001, -0.7, 0.7)), 8, MAX_DISTANCE);
+    const rect = this.canvas.getBoundingClientRect();
+    this._zoomAt(Math.exp(clamp(-delta * 0.001, -0.7, 0.7)), event.clientX - rect.left, event.clientY - rect.top);
     this._cameraChanged();
   }
 }

@@ -77,8 +77,8 @@ for (const type of FLOW_LAYER_TYPES) {
 const tiny = atOrigin('path', { flowSpeed: 500, path: { points: [points[0], { x: Number.MIN_VALUE, y: 0, z: 0 }] } });
 finite(sampleProject(projectOf(tiny), 10));
 
-// Zero/default motion takes exactly the old branches, preserving endpoints
-// and existing tube placement rather than silently replacing legacy frames.
+// Zero/default motion preserves endpoints and leaves all temporal modifiers
+// inactive. Tube frames are shared with Lua even at rounding boundaries.
 const properties = ['flowSpeed', 'partMoveX', 'partMoveY', 'partMoveZ', 'partMoveSpeed', 'partMoveSpread', 'partMovePhase', 'partMovePhaseY', 'partMovePhaseZ'];
 for (const type of LAYER_TYPES) {
   const layer = atOrigin(type, { tube: 2, wave: 4, twist: 20, scale: { x: 2 }, path: { points } });
@@ -90,8 +90,10 @@ for (const type of LAYER_TYPES) {
 }
 nearPoints(sampleProject(projectOf(atOrigin('path', { path: { points } }), 2)), [points[0], points[2]]);
 nearPoint(sampleProject(projectOf(atOrigin('path', { path: { points } }), 1))[0], { x: 10, y: 10, z: 0 });
-nearPoint(sampleProject(projectOf(atOrigin('path', { tube: 2, path: { points: thresholdPoints } }), 1))[0],
-  { x: 1.6806439100854127, y: 0.7247497801609603, z: -0.8063626459393823 }, 1e-12);
+const thresholdTube = sampleProject(projectOf(atOrigin('path', { tube: 2, path: { points: thresholdPoints } }), 1))[0];
+const thresholdOffset = { x: thresholdTube.x - thresholdPoints[1].x / 2, y: thresholdTube.y, z: thresholdTube.z - thresholdPoints[1].z / 2 };
+near(Math.hypot(thresholdOffset.x, thresholdOffset.y, thresholdOffset.z), 2);
+near(thresholdOffset.x * thresholdPoints[1].x + thresholdOffset.z * thresholdPoints[1].z, 0);
 
 // Individual phase stays attached to the original local slot while it flows.
 const motion = { partMoveX: 3, partMoveY: 4, partMoveZ: 5, partMoveSpeed: -0.7, partMoveSpread: 2.5, partMovePhase: 19, partMovePhaseY: 71, partMovePhaseZ: -33 };

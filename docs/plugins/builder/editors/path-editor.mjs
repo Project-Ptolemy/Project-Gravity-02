@@ -20,6 +20,8 @@ export function openPathEditor({ path, onApply, minPoints = 2 }) {
   let width = 600;
   let height = 420;
   let drag = null;
+  const pointers = new Map();
+  let navigating = false;
   let hover = null;
   let alive = true;
   let undoStack = [];
@@ -128,7 +130,7 @@ export function openPathEditor({ path, onApply, minPoints = 2 }) {
     field('vertex').value = selected >= 0 ? selected + 1 : '';
     field('vertex').max = draft.points.length;
     field('vertex').disabled = selected < 0;
-    dialog.querySelectorAll('[data-coordinate]').forEach(input => { input.disabled = selected < 0; input.value = selected < 0 ? '' : rounded(draft.points[selected][input.dataset.coordinate]); });
+    dialog.querySelectorAll('[data-coordinate]').forEach(input => { input.disabled = selected < 0; input.value = selected < 0 ? '' : draft.points[selected][input.dataset.coordinate]; });
     action('delete').disabled = !selection.size;
     action('delete').textContent = selection.size > 1 ? 'Delete selected' : 'Delete vertex';
     ['previous', 'next', 'select-all', 'select-invert'].forEach(name => { action(name).disabled = !draft.points.length; });
@@ -146,7 +148,7 @@ export function openPathEditor({ path, onApply, minPoints = 2 }) {
       select: 'Tap vertices to add or remove them from the selection. Drag empty space to select a box. Switch to Move to drag the selection.',
       freehand: pointCloud ? 'Drag to place points along a stroke. Undo removes the entire stroke.' : 'Drag to sketch a connected stroke. Enable Smooth curve for flowing lines; Undo removes the stroke.',
       pan: 'Drag to move the canvas. Scroll to zoom, or use + / −. Fit brings the whole path into view.'
-    }[mode];
+    }[mode] + ' Use two fingers to pan and pinch to zoom in any tool.';
     field('depth-axis').textContent = axes()[2].toUpperCase();
     field('depth').setAttribute('aria-label', `New point ${axes()[2].toUpperCase()} coordinate`);
     $('.path-editor-axes').textContent = `${axes()[0].toUpperCase()} →   ${axes()[1].toUpperCase()} ↑`;
@@ -244,28 +246,45 @@ export function openPathEditor({ path, onApply, minPoints = 2 }) {
     draft.points.push(point); selectOnly(draft.points.length - 1); return true;
   }
   function finishPointer(event, cancelled = false) {
-    if (!drag || event.pointerId !== drag.id) return;
-    const previous = drag;
-    drag = null;
-    if (cancelled && previous.before) { draft = previous.before.draft; selected = previous.before.selected; selection = new Set(previous.before.selection); }
-    else if (previous.type === 'select') {
+    if (!pointers.has(event.pointerId)) return;
+    const previous = drag?.id === event.pointerId ? drag : null;
+    if (previous) drag = null;
+    if (cancelled && previous?.before) { draft = previous.before.draft; selected = previous.before.selected; selection = new Set(previous.before.selection); }
+    else if (previous?.type === 'draw' && !previous.moved) {
+      const position = pointer(event);
+      if (!pointCloud && draft.points.length >= 3 && hit(position, previous.touch ? 22 : 13) === 0) {
+        draft.closed = true; mode = 'edit'; selectOnly(0);
+      } else addAt(position);
+    } else if (previous?.type === 'freehand') addAt(pointer(event));
+    else if (previous?.type === 'select') {
       const lowX = Math.min(previous.position.x, previous.current.x), highX = Math.max(previous.position.x, previous.current.x);
       const lowY = Math.min(previous.position.y, previous.current.y), highY = Math.max(previous.position.y, previous.current.y);
       selection = new Set(previous.additive ? previous.before.selection : []);
       draft.points.forEach((point, index) => { const p = pixel(point); if (p.x >= lowX && p.x <= highX && p.y >= lowY && p.y <= highY) selection.add(index); });
       selected = [...selection].at(-1) ?? -1;
     }
-    else if (previous.before && JSON.stringify(draft) !== JSON.stringify(previous.before.draft)) remember(previous.before);
+    if (!cancelled && previous?.before && JSON.stringify(draft) !== JSON.stringify(previous.before.draft)) remember(previous.before);
+    pointers.delete(event.pointerId);
+    if (!pointers.size) { navigating = false; hover = null; }
     if (canvas.hasPointerCapture(event.pointerId)) canvas.releasePointerCapture(event.pointerId);
     refresh();
   }
   canvas.addEventListener('pointerdown', event => {
     if (event.button !== 0 && event.button !== 1) return;
-    if (drag) return;
     event.preventDefault(); canvas.focus({ preventScroll: true });
     const position = pointer(event);
+    pointers.set(event.pointerId, position);
+    canvas.setPointerCapture(event.pointerId);
+    if (pointers.size > 1) {
+      // Navigation can begin over a vertex or an unfinished freehand stroke.
+      // Restore that entire edit before moving the view; it gets no undo entry.
+      if (drag?.before) { draft = drag.before.draft; selected = drag.before.selected; selection = new Set(drag.before.selection); }
+      drag = null; navigating = true; hover = null; refresh(); return;
+    }
+    const before = state();
     if (mode === 'pan' || event.button === 1) { drag = { id: event.pointerId, type: 'pan', position, view: { ...view } }; }
     else if (mode === 'edit' || mode === 'select') {
+      drag = { id: event.pointerId, type: 'tap', position, before };
       const index = hit(position, event.pointerType === 'touch' ? 22 : 13);
       if (index >= 0 && (event.shiftKey || mode === 'select')) {
         if (selection.has(index)) { selection.delete(index); selected = [...selection].at(-1) ?? -1; }
@@ -273,49 +292,79 @@ export function openPathEditor({ path, onApply, minPoints = 2 }) {
       } else if (index >= 0) {
         if (!selection.has(index)) selectOnly(index);
         selected = index;
-        drag = { id: event.pointerId, type: 'edit', position, point: { ...draft.points[index] }, before: state() };
+        drag = { id: event.pointerId, type: 'edit', position, point: { ...draft.points[index] }, indices: [...selection], before, touch: event.pointerType === 'touch', moved: false };
       } else if (mode === 'select') {
-        drag = { id: event.pointerId, type: 'select', position, current: position, additive: event.shiftKey, before: state() };
+        drag = { id: event.pointerId, type: 'select', position, current: position, additive: event.shiftKey, before };
       } else if (!event.shiftKey) selectOnly(-1);
       refresh();
     } else if (mode === 'freehand') {
-      drag = { id: event.pointerId, type: 'freehand', position, before: state() };
+      drag = { id: event.pointerId, type: 'freehand', position, before };
       draft.closed = false; addAt(position); refresh();
     } else {
-      if (!pointCloud && draft.points.length >= 3 && hit(position, event.pointerType === 'touch' ? 22 : 13) === 0) change(() => { draft.closed = true; mode = 'edit'; selectOnly(0); });
-      else if (draft.points.length < MAX_PATH_POINTS) {
-        const before = state();
-        if (addAt(position)) { remember(before); refresh(); }
-      } else report(`Maximum ${MAX_PATH_POINTS.toLocaleString()} vertices. Delete some vertices to continue.`);
+      // Commit a tap on release so the first finger of a pinch cannot add or
+      // close geometry. Cancellation and a drag away also leave it untouched.
+      drag = { id: event.pointerId, type: 'draw', position, before, touch: event.pointerType === 'touch', moved: false };
     }
-    if (drag) canvas.setPointerCapture(event.pointerId);
   });
-  canvas.addEventListener('pointermove', event => {
+  function movePointer(event) {
     const position = pointer(event); hover = position;
+    const previous = pointers.get(event.pointerId);
+    if (previous) {
+      if (navigating && pointers.size >= 2) {
+        const pair = [...pointers.entries()].slice(0, 2);
+        const other = pair.some(([id]) => id === event.pointerId) ? pair.find(([id]) => id !== event.pointerId)?.[1] : null;
+        if (other) {
+          const oldCenter = { x: (previous.x + other.x) / 2, y: (previous.y + other.y) / 2 };
+          const newCenter = { x: (position.x + other.x) / 2, y: (position.y + other.y) / 2 };
+          const oldDistance = Math.hypot(previous.x - other.x, previous.y - other.y);
+          const newDistance = Math.hypot(position.x - other.x, position.y - other.y);
+          const before = world(oldCenter);
+          if (oldDistance > 5 && newDistance > 5) view.scale = Math.max(0.025, Math.min(250, view.scale * newDistance / oldDistance));
+          const after = world(newCenter);
+          view.x += before.x - after.x; view.y += before.y - after.y;
+        }
+      }
+      pointers.set(event.pointerId, position);
+    }
+    if (navigating) { hover = null; render(); return; }
     if (!drag) { if (mode === 'draw') render(); return; }
     if (drag.id !== event.pointerId) return;
     if (drag.type === 'pan') { view.x = drag.view.x - (position.x - drag.position.x) / view.scale; view.y = drag.view.y + (position.y - drag.position.y) / view.scale; render(); }
+    else if (drag.type === 'draw') { if (Math.hypot(position.x - drag.position.x, position.y - drag.position.y) > (drag.touch ? 8 : 4)) drag.moved = true; }
     else if (drag.type === 'select') { drag.current = position; render(); }
     else if (drag.type === 'edit') {
+      if (!drag.moved && Math.hypot(position.x - drag.position.x, position.y - drag.position.y) <= (drag.touch ? 8 : 3)) return;
+      drag.moved = true;
       const [horizontal, vertical] = axes();
-      const translation = boundedTranslation(drag.before.draft.points, drag.before.selection, {
+      const translation = boundedTranslation(drag.before.draft.points, drag.indices, {
         [horizontal]: snap(drag.point[horizontal] + (position.x - drag.position.x) / view.scale) - drag.point[horizontal],
         [vertical]: snap(drag.point[vertical] - (position.y - drag.position.y) / view.scale) - drag.point[vertical]
       });
-      draft.points = transformVertices(drag.before.draft.points, drag.before.selection, { translation });
+      draft.points = transformVertices(drag.before.draft.points, drag.indices, { translation });
       refresh();
-    } else if (Math.hypot(position.x - drag.position.x, position.y - drag.position.y) >= 5) {
+    } else if (drag.type === 'freehand' && Math.hypot(position.x - drag.position.x, position.y - drag.position.y) >= 5) {
       if (addAt(position)) { drag.position = position; refresh(); }
     }
-  });
+  }
+  canvas.addEventListener('pointermove', movePointer);
   canvas.addEventListener('pointerup', event => {
-    if (drag?.type === 'freehand' && drag.id === event.pointerId) addAt(pointer(event));
+    if (pointers.has(event.pointerId)) movePointer(event);
     finishPointer(event);
   });
   canvas.addEventListener('pointercancel', event => finishPointer(event, true));
-  canvas.addEventListener('lostpointercapture', event => finishPointer(event));
+  canvas.addEventListener('lostpointercapture', event => finishPointer(event, true));
+  function cancelPointers() {
+    for (const pointerId of [...pointers.keys()]) finishPointer({ pointerId }, true);
+  }
+  const visibilityChange = () => { if (document.hidden) cancelPointers(); };
+  window.addEventListener('blur', cancelPointers);
+  document.addEventListener('visibilitychange', visibilityChange);
   canvas.addEventListener('pointerleave', () => { hover = null; render(); });
-  canvas.addEventListener('wheel', event => { event.preventDefault(); if (!drag) zoom(Math.exp(-event.deltaY * 0.0015), pointer(event)); }, { passive: false });
+  canvas.addEventListener('wheel', event => {
+    event.preventDefault();
+    const delta = event.deltaY * (event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? height : 1);
+    if (!pointers.size) zoom(Math.exp(Math.max(-0.7, Math.min(0.7, -delta * 0.0015))), pointer(event));
+  }, { passive: false });
   canvas.addEventListener('contextmenu', event => event.preventDefault());
 
   function insert() {
@@ -325,7 +374,7 @@ export function openPathEditor({ path, onApply, minPoints = 2 }) {
       let point = { x: 0, y: 0, z: 0 };
       if (current) {
         const next = draft.points[selected + 1] || (draft.closed ? draft.points[0] : null);
-        point = next ? Object.fromEntries(['x', 'y', 'z'].map(axis => [axis, rounded((current[axis] + next[axis]) / 2)])) : { ...current, [axes()[0]]: bound(current[axes()[0]] + step()) };
+        point = next ? Object.fromEntries(['x', 'y', 'z'].map(axis => [axis, (current[axis] + next[axis]) / 2])) : { ...current, [axes()[0]]: bound(current[axes()[0]] + step()) };
       }
       const index = selected + 1; draft.points.splice(index, 0, point); selectOnly(index); mode = 'edit';
     });
@@ -363,7 +412,7 @@ export function openPathEditor({ path, onApply, minPoints = 2 }) {
   function redo() { if (redoStack.length) { undoStack.push(state()); restore(redoStack.pop()); } }
   dialog.addEventListener('click', event => {
     const button = event.target.closest('button');
-    if (!button || drag) return;
+    if (!button || pointers.size) return;
     if (button.dataset.mode) { setMode(button.dataset.mode); return; }
     switch (button.dataset.action) {
       case 'cancel': dialog.close(); break;
@@ -390,7 +439,7 @@ export function openPathEditor({ path, onApply, minPoints = 2 }) {
     }
   });
   field('plane').addEventListener('change', event => {
-    plane = event.target.value; field('depth').value = selected >= 0 ? rounded(draft.points[selected][axes()[2]]) : 0; refresh(); fit();
+    plane = event.target.value; field('depth').value = selected >= 0 ? draft.points[selected][axes()[2]] : 0; refresh(); fit();
   });
   ['closed', 'smooth'].forEach(name => field(name).addEventListener('change', event => change(() => { draft[name] = event.target.checked; })));
   field('snap').addEventListener('change', render);
@@ -400,15 +449,16 @@ export function openPathEditor({ path, onApply, minPoints = 2 }) {
   dialog.querySelectorAll('[data-coordinate]').forEach(input => input.addEventListener('change', () => {
     const value = Number(input.value);
     if (selected < 0 || !input.value.trim() || !Number.isFinite(value)) { refresh(); report('Enter a finite coordinate between −5000 and 5000.'); return; }
-    const next = rounded(bound(value));
+    const next = bound(value);
     if (draft.points[selected][input.dataset.coordinate] !== next) change(() => { draft.points[selected][input.dataset.coordinate] = next; });
     else refresh();
   }));
   dialog.addEventListener('keydown', event => {
     // Keep editor shortcuts local; the scene underneath has its own shortcuts.
     event.stopPropagation();
+    if (event.key === 'Escape' && pointers.size) { event.preventDefault(); cancelPointers(); return; }
     const editing = event.target.matches('input, textarea, select');
-    if (editing || drag) return;
+    if (editing || pointers.size) return;
     const key = event.key.toLowerCase();
     if ((event.ctrlKey || event.metaKey) && key === 'z') { event.preventDefault(); if (event.shiftKey) redo(); else undo(); return; }
     if ((event.ctrlKey || event.metaKey) && key === 'y') { event.preventDefault(); redo(); return; }
@@ -432,11 +482,17 @@ export function openPathEditor({ path, onApply, minPoints = 2 }) {
   const resize = new ResizeObserver(() => {
     const rect = canvas.getBoundingClientRect();
     if (!rect.width || !rect.height) return;
+    if (rect.width !== width || rect.height !== height) cancelPointers();
     width = rect.width; height = rect.height;
     const ratio = Math.min(2, window.devicePixelRatio || 1);
     canvas.width = Math.round(width * ratio); canvas.height = Math.round(height * ratio); ctx.setTransform(ratio, 0, 0, ratio, 0, 0); render();
   });
-  dialog.addEventListener('close', () => { alive = false; resize.disconnect(); dialog.remove(); }, { once: true });
+  dialog.addEventListener('close', () => {
+    alive = false; cancelPointers(); resize.disconnect();
+    window.removeEventListener('blur', cancelPointers);
+    document.removeEventListener('visibilitychange', visibilityChange);
+    dialog.remove();
+  }, { once: true });
   dialog.showModal(); resize.observe(canvas); refresh();
   requestAnimationFrame(() => { if (alive) { const rect = canvas.getBoundingClientRect(); width = rect.width; height = rect.height; fit(); canvas.focus({ preventScroll: true }); } });
   return dialog;
