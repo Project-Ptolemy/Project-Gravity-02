@@ -12,16 +12,18 @@ Use the bottom bar to switch between **Preview**, **Layers**, **Edit**, and
 **Controls**. Layers and properties use the full screen width, with a live preview
 above them. Preview expands the canvas and reveals the Move, Core, and Snap tools.
 In landscape, the preview and active panel sit side by side, including tablets.
-Compact toolbars and layer rows leave more room for editing; save status, the
-plugin guide, and Help sit at the bottom of Layers. The layout adapts to the
+Compact sizing is the default: 30-pixel fields, 32-pixel buttons, and inline XYZ
+controls keep the interface small. Choose **UI size → Comfortable** at the bottom
+of Layers for larger controls; this preference is saved in your browser. Save
+status, the plugin guide, and Help are there too. The layout adapts to the
 software keyboard and device safe areas, retaining your selection and values
 when you rotate the device.
 
 Drag empty space to orbit; pinch with two fingers to zoom and pan. Touch starts in
 camera mode. Enable **Move** in the expanded preview to drag a layer or its XYZ
 handles. Starting a pinch cancels an unfinished geometry move. In the path editor,
-a two-finger gesture navigates without adding vertices. Exact numeric fields and
-sliders keep 44-pixel touch targets; typed geometry values retain their precision.
+a two-finger gesture navigates without adding vertices. Numeric text grows while
+focused for easier entry; typed geometry values retain their precision.
 The path editor fills the screen: **Settings** opens exact coordinates, smoothing,
 snapping, and selection transforms; **Canvas** returns to drawing. Undo, Redo,
 and Apply stay within reach in either orientation. Tap **?** for drawing tips.

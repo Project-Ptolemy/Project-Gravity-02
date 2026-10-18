@@ -1,5 +1,5 @@
 /* Shared touch ergonomics and the full-width mobile workspace. Loaded last. */
-.mobile-navigation,.layer-edit,.touch-help{display:none}
+.mobile-navigation,.layer-edit,.touch-help,.mobile-density{display:none}
 .export-source{margin:18px 0;border:1px solid var(--line);border-radius:7px}
 .export-source>summary{padding:14px;cursor:pointer;color:var(--muted);font-size:12px}
 .export-source textarea{border-radius:0 0 7px 7px}
@@ -8,33 +8,38 @@
 #zoom-out{font-size:22px}
 @media(pointer:coarse),(max-width:1024px){
   button,a,summary{touch-action:manipulation;-webkit-tap-highlight-color:transparent}
-  button:not(.color-swatch),select,input:not([type=checkbox]):not([type=color]):not([type=range]),summary{min-height:44px}
-  .icon-button,.layer-row .icon-button,.history-actions .icon-button{width:44px;height:44px;min-width:44px}
+  button:not(.color-swatch),select,input:not([type=checkbox]):not([type=color]):not([type=range]),summary{min-height:var(--control-size,44px)}
+  .icon-button,.layer-row .icon-button,.history-actions .icon-button{width:var(--control-size,44px);height:var(--control-size,44px);min-width:var(--control-size,44px)}
   input:not([type=range]):not([type=checkbox]):not([type=color]),select,textarea,
-  .path-editor input[type=number],.source-inputs input[id^=source-formula-]{font-size:16px}
-  input[type=range]{height:44px;background:transparent;touch-action:pan-y}
+  .path-editor input[type=number],.source-inputs input[id^=source-formula-]{font-size:var(--field-font,16px)}
+  input[type=range]{height:var(--control-size,44px);background:transparent;touch-action:pan-y}
   input[type=range]::-webkit-slider-runnable-track{height:4px;background:#4b5940;border-radius:3px}
   input[type=range]::-webkit-slider-thumb{width:24px;height:24px;margin-top:-10px;box-shadow:0 0 0 5px #d4ef9d12}
   input[type=range]::-moz-range-track{height:4px;background:#4b5940;border-radius:3px}
   input[type=range]::-moz-range-thumb{width:24px;height:24px}
   input[type=checkbox]{width:22px;height:22px;flex-shrink:0}
-  .checkbox-row,.fill-toggle{min-height:44px}
-  .expose-button,.transform-expose{min-width:44px;min-height:44px;opacity:1}
-  .color-swatch,input[type=color]{width:44px;height:44px;min-width:44px}
+  .checkbox-row,.fill-toggle{min-height:var(--control-size,44px)}
+  .expose-button,.transform-expose{min-width:var(--control-size,44px);min-height:var(--control-size,44px);opacity:1}
+  .color-swatch,input[type=color]{width:var(--control-size,44px);height:var(--control-size,44px);min-width:var(--control-size,44px)}
   .touch-help{display:block}
-  .path-editor button.path-editor-close{width:44px;height:44px;min-height:44px}
-  .path-editor button,.path-editor-tools button,.path-editor-vertex-nav button,.path-editor-selection-actions button,.path-editor-history button{min-height:44px}
+  .path-editor button.path-editor-close{width:var(--control-size,44px);height:var(--control-size,44px);min-height:var(--control-size,44px)}
+  .path-editor button,.path-editor-tools button,.path-editor-vertex-nav button,.path-editor-selection-actions button,.path-editor-history button{min-height:var(--control-size,44px)}
 }
 @media(max-width:1024px){
-  :root{--mobile-nav-height:48px;--muted:#acbaa1;--subtle:#99aa8d}
+  :root{--control-size:32px;--icon-size:30px;--field-size:30px;--field-font:12px;--label-font:11px;--mobile-nav-height:38px;--mobile-header-height:40px;--muted:#acbaa1;--subtle:#99aa8d}
+  :root[data-density=comfortable]{--control-size:44px;--icon-size:44px;--field-size:44px;--field-font:16px;--label-font:13px;--mobile-nav-height:48px;--mobile-header-height:52px}
+  .mobile-density{display:flex;align-items:center;justify-content:space-between;gap:8px;width:100%;padding:4px 0;font-size:11px}
+  .mobile-density select{width:126px}
+  input:not([type=range]):not([type=checkbox]):not([type=color]),select{height:var(--field-size);min-height:var(--field-size)}
+  .axis-field{height:auto}
   html{height:100%;overflow:hidden}
-  body{height:var(--app-height,100dvh);display:grid;grid-template-rows:52px minmax(0,1fr);overflow:hidden;padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left)}
+  body{height:var(--app-height,100dvh);display:grid;grid-template-rows:var(--mobile-header-height) minmax(0,1fr);overflow:hidden;padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left)}
   .topbar{height:auto;min-height:0;padding:0 12px;gap:10px}
   .brand{gap:0;font-size:10px;letter-spacing:1px}
   .brand>span:last-child,.brand-sub,.header-divider,.local-badge,.hide-small{display:none}
   .brand-mark{width:30px}.brand-mark svg{width:28px}
   .project-heading{flex:1;margin:0;min-width:0}
-  #project-name{width:100%;font-size:16px;min-width:0;padding:8px 4px}
+  #project-name{width:100%;font-size:var(--field-font,16px);min-width:0;padding:8px 4px}
   .header-actions{gap:5px;margin:0}
   .history-actions{gap:0;border:0;padding:0}
   .header-actions .primary-button{font-size:12px;padding:9px 12px;gap:6px}
@@ -59,24 +64,24 @@
   .scene-caption .eyebrow,.scene-caption h2{display:none}
   .scene-caption h2{font-size:19px;line-height:1.4;max-width:100%}
   .scene-caption p{font-size:10px;width:auto;gap:5px;line-height:1.5;flex-wrap:wrap}
-  .view-options{gap:0}.view-options select{font-size:16px;min-width:0;width:112px;max-width:112px;padding:7px 3px}
+  .view-options{gap:0}.view-options select{font-size:var(--field-font,16px);min-width:0;width:112px;max-width:112px;padding:7px 3px}
   .view-options #toggle-grid{display:none}
   .canvas-tools{top:56px;right:8px;padding:0;background:#1b2419e8;border:1px solid #3f5033;border-radius:9px;gap:0}
-  .canvas-tools .icon-button{width:44px;height:44px;padding:10px}
+  .canvas-tools .icon-button{width:var(--control-size,44px);height:var(--control-size,44px);padding:10px}
   .workspace:not([data-mobile-panel=preview]) .canvas-tools .icon-button:not(#fit-view){display:none}
   .workspace:not([data-mobile-panel=preview]) .manipulation-tools{display:none}
   .manipulation-tools{top:67px;left:12px;gap:0;padding:2px;background:#1b2419e8;max-width:calc(100% - 75px)}
   .workspace[data-mobile-panel=preview] .manipulation-tools{top:56px}
   .tool-toggle{font-size:12px;padding:7px 8px;gap:5px}
   .manipulation-tools>label{font-size:10px;margin:0 4px}
-  .manipulation-tools select{font-size:16px;width:66px;padding:5px 0}
+  .manipulation-tools select{font-size:var(--field-font,16px);width:66px;padding:5px 0}
   .playback-bar{bottom:6px;padding:0 5px;gap:5px;max-width:calc(100% - 16px);border-radius:8px}
-  .play-button{width:44px;height:44px}
+  .play-button{width:var(--control-size,44px);height:var(--control-size,44px)}
   .time-display{font-size:12px;min-width:63px}
-  .playback-bar select{font-size:16px;padding:4px;min-width:59px}
+  .playback-bar select{font-size:var(--field-font,16px);padding:4px;min-width:59px}
   .timeline-track,.live-label,.canvas-bottom{display:none}
   .motion-hint{bottom:56px;left:8px;right:60px;padding:0 5px;gap:4px;font-size:11px;line-height:1.5}
-  .motion-hint>span{display:none}.motion-hint>button{font-size:11px;min-height:44px;padding:8px;flex:1}
+  .motion-hint>span{display:none}.motion-hint>button{font-size:11px;min-height:var(--control-size,44px);padding:8px;flex:1}
   .workspace[data-mobile-panel=preview] .motion-hint>span{display:block}
   .drag-readout{bottom:67px;font-size:11px;max-width:calc(100% - 24px);white-space:normal}
   .empty-scene{padding:50px 58px 50px 12px}.empty-scene h2{display:none}.empty-scene p,.empty-orbit{display:none}.empty-scene .primary-button{margin-top:8px}
@@ -85,19 +90,19 @@
   .count-badge{font-size:11px}.left-section-label,.left-section-label>span:last-child{font-size:10px}
   .left-panel .layers{flex:0 0 auto;height:auto;min-height:0;max-height:none;overflow:visible;gap:4px;padding-bottom:0}
   .layer-row{min-height:46px;padding:0 4px;gap:4px}
-  .layer-select{font-size:13px;min-height:44px;gap:8px;padding:7px 1px}
+  .layer-select{font-size:13px;min-height:var(--control-size,44px);gap:8px;padding:7px 1px}
   .layer-row .icon-button svg{width:19px;height:19px}
-  .layer-edit{display:inline-flex;padding:8px;font-size:12px;min-width:44px}
-  .layer-search{padding:0 8px;margin-bottom:6px}.layer-search input{font-size:16px;padding:7px 0}
-  .add-shape-button{grid-column:1;font-size:12px;min-height:44px;margin:8px 0 0;padding:6px;gap:5px}
+  .layer-edit{display:inline-flex;padding:8px;font-size:12px;min-width:var(--control-size,44px)}
+  .layer-search{padding:0 8px;margin-bottom:6px}.layer-search input{font-size:var(--field-font,16px);padding:7px 0}
+  .add-shape-button{grid-column:1;font-size:12px;min-height:var(--control-size,44px);margin:8px 0 0;padding:6px;gap:5px}
   .add-shape-button .key-hint{display:none}
   .creation-actions{display:contents}
-  .creation-actions>.secondary-button{grid-column:2;font-size:12px;min-height:44px;margin-top:8px;justify-content:center;padding:6px;gap:5px}
+  .creation-actions>.secondary-button{grid-column:2;font-size:12px;min-height:var(--control-size,44px);margin-top:8px;justify-content:center;padding:6px;gap:5px}
   .creation-actions>div{grid-column:1/-1;gap:8px;justify-content:space-between;flex-wrap:wrap;margin-top:2px}
   .creation-actions .quiet-button,.layer-actions .quiet-button,.layer-utilities .quiet-button{font-size:12px}
   .layer-actions,.layer-utilities{flex-wrap:wrap;gap:8px}.layer-utilities{justify-content:space-between}
   .repeat-layer-button{font-size:12px;padding:8px;margin:6px 0}
-  .sidebar-disclosure>summary{min-height:44px;font-size:11px;letter-spacing:.6px}
+  .sidebar-disclosure>summary{min-height:var(--control-size,44px);font-size:11px;letter-spacing:.6px}
   .sidebar-disclosure>summary>span:first-child{display:block}
   .presets-section>p,.micro-copy,.section-note{font-size:12px;line-height:1.7}
   .preset-grid{grid-template-columns:repeat(3,minmax(0,1fr))}
@@ -106,31 +111,31 @@
   .preset-card>span:last-child,.preset-card:first-child>span:last-child{font-size:11px}
   .preset-card:first-child>span:last-child::after{display:none}
   .setting-row,.preview-settings .setting-row{font-size:13px;display:flex;flex-wrap:wrap;gap:12px}
-  .setting-row select{width:150px;font-size:16px}.setting-row input[type=range]{width:100%;margin:0}
+  .setting-row select{width:150px;font-size:var(--field-font,16px)}.setting-row input[type=range]{width:100%;margin:0}
   .preview-settings input[type=number]{width:150px}
   .frame-controls .quiet-button{font-size:12px}.project-files{gap:12px;padding:4px 0}.project-files .quiet-button{font-size:13px}
-  .selected-heading{padding:8px 12px;gap:8px}.selected-heading input{font-size:16px;width:100%}.selected-heading p{font-size:10px;margin-top:0}
+  .selected-heading{padding:8px 12px;gap:8px}.selected-heading input{font-size:var(--field-font,16px);width:100%}.selected-heading p{font-size:10px;margin-top:0}
   .property-group,.property-section{padding-left:12px;padding-right:12px}
-  .property-group>summary{font-size:13px;min-height:44px;padding:8px 0}
+  .property-group>summary{font-size:13px;min-height:var(--control-size,44px);padding:8px 0}
   .property-group[open]{padding-bottom:10px}
   .property-group .controls-counter{display:inline;font-size:10px}
-  .property-row{grid-template-columns:minmax(0,1fr) 108px 44px;gap:0 8px;margin-top:8px}
+  .property-row{grid-template-columns:minmax(0,1fr) 108px var(--control-size,44px);gap:0 8px;margin-top:8px}
   .property-row label{font-size:13px;line-height:1.4}.property-row label small{font-size:10px}
-  .property-row input[type=number]{font-size:16px;width:108px;min-height:44px;padding:8px}
+  .property-row input[type=number]{font-size:var(--field-font,16px);width:108px;min-height:var(--control-size,44px);padding:8px}
   .property-row input[type=range]{margin:0;grid-column:1/-1;width:100%}
-  .expose-button{width:44px;height:44px;border:1px solid var(--line);border-radius:6px}
+  .expose-button{width:var(--control-size,44px);height:var(--control-size,44px);border:1px solid var(--line);border-radius:6px}
   .transform-label{font-size:11px;margin:10px 0 5px}
   .transform-row{gap:6px}.axis-field{position:relative;min-width:0;display:grid;grid-template-columns:20px minmax(0,1fr);padding:0 5px}
-  .axis-field span{font-size:12px}.axis-field input{font-size:16px;width:100%;min-width:0;padding:8px 2px;text-align:right}
-  .transform-expose{position:static;grid-column:1/-1;width:100%;height:44px;border-top:1px solid var(--line);background:#d4ef9d06;color:var(--accent);font-size:18px}
+  .axis-field span{font-size:12px}.axis-field input{font-size:var(--field-font,16px);width:100%;min-width:0;padding:8px 2px;text-align:right}
+  .transform-expose{position:static;grid-column:1/-1;width:100%;height:var(--control-size,44px);border-top:1px solid var(--line);background:#d4ef9d06;color:var(--accent);font-size:18px}
   .section-reset{font-size:12px}.section-note.motion-note,.part-axis-phases>summary{font-size:12px}
   .custom-geometry-panel{padding:10px 12px}.custom-geometry-panel>p,.custom-geometry-summary{font-size:12px}.custom-geometry-panel>.secondary-button{font-size:12px}
-  .geometry-mirrors{font-size:12px;gap:12px}.geometry-mirrors button{min-width:44px}
+  .geometry-mirrors{font-size:12px;gap:12px}.geometry-mirrors button{min-width:var(--control-size,44px)}
   .color-row{gap:10px;flex-wrap:wrap}.color-value{font-size:11px}.part-tracker{font-size:13px}
-  .controls-intro{padding:12px}.controls-intro h2{font-size:16px}.controls-intro p{font-size:12px}
+  .controls-intro{padding:12px}.controls-intro h2{font-size:var(--field-font,16px)}.controls-intro p{font-size:12px}
   .control-card{margin:0 12px 10px;padding:10px}.control-card-heading>label{font-size:14px}.control-limits{font-size:11px}
-  .control-card input[type=number]{font-size:16px;min-width:90px}.control-binding-status{font-size:12px}
-  .statusbar{height:auto;min-height:44px;overflow:visible;padding:4px 0;gap:4px 12px;flex-wrap:wrap;border-top:1px solid var(--line);margin-top:4px}
+  .control-card input[type=number]{font-size:var(--field-font,16px);min-width:90px}.control-binding-status{font-size:12px}
+  .statusbar{height:auto;min-height:var(--control-size,44px);overflow:visible;padding:4px 0;gap:4px 12px;flex-wrap:wrap;border-top:1px solid var(--line);margin-top:4px}
   .statusbar>span:first-child{flex-basis:100%!important}
   .statusbar>span:first-child{font-size:10px;flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .site-navigation{gap:12px;font-size:11px}.site-navigation a{display:flex;align-items:center;min-height:40px;white-space:nowrap}
@@ -142,25 +147,25 @@
   .form-columns{gap:10px}.form-columns:not(.thirds){grid-template-columns:repeat(2,minmax(0,1fr))}
   .form-label{margin:12px 0;gap:6px}
   .modal-actions{position:sticky;bottom:-14px;margin-bottom:-14px;margin-inline:-14px;padding:8px 14px;background:var(--panel);border-top:1px solid var(--line);z-index:2;display:flex;gap:10px;flex-wrap:wrap}
-  .modal-actions>button{flex:1;font-size:12px;padding:8px;min-height:44px}
+  .modal-actions>button{flex:1;font-size:12px;padding:8px;min-height:var(--control-size,44px)}
   .custom-shape-library{gap:8px}.custom-shape-library button{padding:10px;grid-template-columns:24px minmax(0,1fr);gap:5px 8px;white-space:normal}
   .custom-shape-library strong{font-size:12px}.custom-shape-library small{grid-column:1/-1;font-size:11px;line-height:1.4}.custom-shape-library button>span{grid-row:1}
   .custom-shape-library button svg{width:22px;height:22px}.formula-icon{font-size:20px}.library-label{margin:16px 0 10px;font-size:9px}
   .shape-library{grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}.shape-option{min-height:70px;font-size:11px;padding:8px 4px;gap:5px}
   .shape-option svg{width:26px;height:26px}
   .export-summary{font-size:12px;overflow-wrap:anywhere}.export-instructions p{font-size:13px}.export-instructions{align-items:start}
-  #export-code{font-size:16px;height:200px;padding:12px}.export-source>summary{font-size:14px}
+  #export-code{font-size:var(--field-font,16px);height:200px;padding:12px}.export-source>summary{font-size:14px}
   .help-steps{grid-template-columns:1fr}.help-steps h3{font-size:15px}.help-steps p,.motion-help{font-size:13px}.shortcut-grid{font-size:12px}
   .source-layout,.surface-layout,.repeat-layout{grid-template-columns:1fr;gap:14px}
   .source-preview canvas,.surface-preview canvas,.repeat-preview-panel canvas{height:190px}
-  .surface-preview{position:static}.source-inputs textarea{font-size:16px}.source-inputs input[type=file]{font-size:14px}
+  .surface-preview{position:static}.source-inputs textarea{font-size:var(--field-font,16px)}.source-inputs input[type=file]{font-size:14px}
   .source-reference,.source-preview p,.surface-preview p,.repeat-preview-panel p{font-size:12px}
   .repeat-vector label,.repeat-vector legend{font-size:12px}
   .path-editor{width:calc(100vw - 16px);max-height:calc(var(--app-height,100dvh) - 16px);border-radius:12px}
   .path-editor-header{padding:14px}.path-editor-header h2{font-size:21px}
   .path-editor-toolbar{padding:0 12px 8px;gap:8px}.path-editor-tools{width:100%;justify-content:space-between}
   .path-editor-tools button{font-size:12px;padding:6px;flex:1;min-width:0}
-  .path-editor-inline select{font-size:16px;max-width:110px}.path-editor-inline{font-size:12px}
+  .path-editor-inline select{font-size:var(--field-font,16px);max-width:110px}.path-editor-inline{font-size:12px}
   .path-editor-instructions{font-size:12px;min-height:0;padding:0 14px 10px}
   .path-editor-body{display:flex;flex-direction:column;min-height:120px;overflow:auto;overscroll-behavior:contain}
   .path-editor-canvas-wrap{flex:0 0 auto;height:clamp(230px,35dvh,370px);min-height:230px}
@@ -170,7 +175,7 @@
   .path-editor-property-heading output,.path-editor-center{font-size:11px}.path-editor-note+.path-editor-note{font-size:12px}
   .path-editor-coordinates label,.path-editor-transform-row label,.path-editor-transform-row legend,.path-editor-flatten label{font-size:12px}
   .path-editor-snap{flex-direction:row;align-items:center}.path-editor-snap input[type=number]{width:80px}
-  .path-editor-vertex-nav button{min-width:44px}.path-editor-vertex-nav input{min-width:60px}
+  .path-editor-vertex-nav button{min-width:var(--control-size,44px)}.path-editor-vertex-nav input{min-width:60px}
   .path-editor-footer{padding:10px 12px;gap:7px;background:var(--panel)}
   .path-editor-history{width:100%;gap:5px;display:flex;flex-wrap:wrap}.path-editor-history button{flex:1;font-size:11px;padding:6px}
   .path-editor-status{font-size:11px;order:3;flex-basis:100%;min-width:0;max-height:34px;overflow:auto}
@@ -178,16 +183,16 @@
   .path-editor-node-actions button,.path-editor-selection-actions button{font-size:12px}
   .keyboard-open .workspace{grid-template-rows:0 minmax(0,1fr) var(--mobile-nav-height)}
   .keyboard-open .canvas-area{visibility:hidden}.keyboard-open .workspace[data-mobile-panel=preview] .canvas-area{visibility:visible}
-  .keyboard-open{grid-template-rows:48px minmax(0,1fr)}
+  .keyboard-open{grid-template-rows:var(--mobile-header-height) minmax(0,1fr)}
 }
 @media(max-width:360px){
   .topbar{gap:5px;padding:0 8px}.header-actions .primary-button{padding:8px 9px}.header-actions .primary-button svg{display:none}
-  .property-row{grid-template-columns:minmax(0,1fr) 90px 44px;gap:4px 7px}.property-row input[type=number]{width:90px}
+  .property-row{grid-template-columns:minmax(0,1fr) 90px var(--control-size,44px);gap:4px 7px}.property-row input[type=number]{width:90px}
   .manipulation-tools{left:9px}.tool-toggle{padding:6px;font-size:11px}.manipulation-tools select{width:58px}
   .path-editor-zoom{gap:2px}.path-editor-zoom button{padding:5px;min-width:36px}
 }
 @media(max-width:1024px) and (min-width:480px) and (orientation:landscape){
-  body{grid-template-rows:48px minmax(0,1fr)}
+  body{grid-template-rows:var(--mobile-header-height) minmax(0,1fr)}
   .workspace{grid-template-columns:minmax(0,1fr) clamp(260px,42vw,380px);grid-template-rows:minmax(0,1fr) var(--mobile-nav-height)}
   .canvas-area{grid-column:1;grid-row:1}.panel{grid-column:2;grid-row:1;border-left:1px solid var(--line)}
   .mobile-navigation{grid-column:1/-1;grid-row:2;grid-template-columns:repeat(4,1fr)}
@@ -206,4 +211,114 @@
 }
 @media(max-width:559px) and (orientation:landscape){
   .workspace[data-mobile-panel=preview] .manipulation-tools{top:104px;left:8px}
+}
+/* Compact is the default: reduce the controls themselves, not just the surrounding layout. */
+@media(max-width:1024px){
+  :root[data-density=compact] .topbar{padding:0 8px;gap:6px}
+  :root[data-density=compact] .brand-mark{width:24px}
+  :root[data-density=compact] .brand-mark svg{width:22px;height:24px}
+  :root[data-density=compact] #project-name{font-size:12px;padding:4px}
+  :root[data-density=compact] .header-actions .primary-button{font-size:11px;padding:4px 9px;gap:5px}
+  :root[data-density=compact] .workspace{grid-template-rows:clamp(120px,24%,180px) minmax(0,1fr) var(--mobile-nav-height)}
+  :root[data-density=compact] .left-panel{padding:0 8px 8px;column-gap:6px}
+  :root[data-density=compact] .mobile-navigation button{font-size:10px;border-radius:5px;gap:5px}
+  :root[data-density=compact] .mobile-navigation svg{width:14px;height:14px}
+  :root[data-density=compact] button svg,:root[data-density=compact] span[data-icon]>svg{width:15px;height:15px}
+  :root[data-density=compact] .icon-button,:root[data-density=compact] .layer-row .icon-button,:root[data-density=compact] .history-actions .icon-button,:root[data-density=compact] .canvas-tools .icon-button{width:30px;min-width:30px;height:30px;min-height:30px;padding:6px}
+  :root[data-density=compact] .canvas-top{top:4px;left:8px;right:6px;gap:6px}
+  :root[data-density=compact] .scene-caption p{font-size:9px;gap:4px;line-height:1.4;margin:0}
+  :root[data-density=compact] .view-options select{width:94px;max-width:94px;padding:4px}
+  :root[data-density=compact] .canvas-tools{top:40px;right:6px}
+  :root[data-density=compact] .workspace[data-mobile-panel=preview] .canvas-tools,:root[data-density=compact] .workspace[data-mobile-panel=preview] .manipulation-tools{top:40px}
+  :root[data-density=compact] .manipulation-tools{left:8px;padding:1px;max-width:calc(100% - 50px)}
+  :root[data-density=compact] .tool-toggle{font-size:11px;padding:4px 6px;gap:4px}
+  :root[data-density=compact] .manipulation-tools select{width:52px;padding:3px 0}
+  :root[data-density=compact] .playback-bar{height:34px;bottom:4px;padding:0 3px;gap:4px}
+  :root[data-density=compact] .empty-scene{padding:34px 42px 38px 8px}
+  :root[data-density=compact] .time-display{font-size:10px;min-width:57px}
+  :root[data-density=compact] .playback-bar select{padding:3px;min-width:48px}
+  :root[data-density=compact] .motion-hint{bottom:44px;right:46px}
+  :root[data-density=compact] .motion-hint>button{font-size:10px;padding:4px}
+  :root[data-density=compact] .panel-heading{height:36px;min-height:36px}
+  :root[data-density=compact] .panel-heading h1{font-size:13px}
+  :root[data-density=compact] .count-badge{font-size:10px}
+  :root[data-density=compact] .layer-row{min-height:36px;padding:0 3px;gap:3px}
+  :root[data-density=compact] .layer-select{font-size:12px;gap:6px;padding:4px 1px}
+  :root[data-density=compact] .layer-symbol{width:19px;height:19px}
+  :root[data-density=compact] .layer-symbol svg{width:18px;height:18px}
+  :root[data-density=compact] .layer-edit{font-size:10px;padding:4px}
+  :root[data-density=compact] .layer-search{padding:0 6px;margin-bottom:4px}
+  :root[data-density=compact] .layer-search input{padding:4px 0}
+  :root[data-density=compact] .add-shape-button,:root[data-density=compact] .creation-actions>.secondary-button{font-size:11px;padding:4px;gap:4px;margin-top:6px}
+  :root[data-density=compact] .creation-actions .quiet-button,:root[data-density=compact] .layer-actions .quiet-button,:root[data-density=compact] .layer-utilities .quiet-button{font-size:11px}
+  :root[data-density=compact] .layer-actions,:root[data-density=compact] .layer-utilities{gap:4px;padding-block:4px}
+  :root[data-density=compact] .repeat-layer-button{font-size:11px;padding:5px;margin:4px 0}
+  :root[data-density=compact] .presets-section>p,:root[data-density=compact] .micro-copy,:root[data-density=compact] .section-note{font-size:11px;line-height:1.5}
+  :root[data-density=compact] .sidebar-disclosure>summary{font-size:10px}
+  :root[data-density=compact] .setting-row,:root[data-density=compact] .preview-settings .setting-row{font-size:11px;gap:6px}
+  :root[data-density=compact] .selected-heading{padding:5px 8px;gap:6px}
+  :root[data-density=compact] .selected-heading p{font-size:9px}
+  :root[data-density=compact] .selected-heading input{height:30px;min-height:30px;padding:3px 2px}
+  :root[data-density=compact] .property-group,:root[data-density=compact] .property-section{padding-left:8px;padding-right:8px}
+  :root[data-density=compact] .property-group>summary{font-size:11px;padding:5px 0}
+  :root[data-density=compact] .property-group[open]{padding-bottom:6px}
+  :root[data-density=compact] .property-row{grid-template-columns:minmax(0,1fr) 68px 28px;grid-template-rows:auto 24px;gap:0 6px;margin-top:6px;align-items:center}
+  :root[data-density=compact] .property-row label{grid-column:1;grid-row:1;font-size:11px;line-height:1.3}
+  :root[data-density=compact] .property-row label small{font-size:9px}
+  :root[data-density=compact] .property-row input[type=number]{grid-column:2;grid-row:1/3;width:68px;height:30px;min-height:30px;padding:4px}
+  :root[data-density=compact] .property-row input[type=range]{grid-column:1;grid-row:2;width:100%;height:24px;min-height:24px;margin:0}
+  :root[data-density=compact] .expose-button{grid-column:3;grid-row:1/3;width:28px;min-width:28px;height:28px;min-height:28px;border-radius:4px}
+  :root[data-density=compact] .transform-label{font-size:10px;margin:6px 0 3px}
+  :root[data-density=compact] .transform-row{gap:5px}
+  :root[data-density=compact] .axis-field{height:32px;grid-template-columns:12px minmax(0,1fr) 28px;align-items:center;padding:0 2px;overflow:visible}
+  :root[data-density=compact] .axis-field span{font-size:10px}
+  :root[data-density=compact] .axis-field input{height:30px;min-height:0;padding:3px 2px}
+  :root[data-density=compact] .transform-expose{position:static;grid-column:3;grid-row:1;width:28px;min-width:28px;height:28px;min-height:28px;border-top:0;border-left:1px solid var(--line);font-size:15px}
+  :root[data-density=compact] .section-reset{font-size:11px;margin-top:6px}
+  :root[data-density=compact] .section-note.motion-note,:root[data-density=compact] .part-axis-phases>summary{font-size:11px}
+  :root[data-density=compact] .custom-geometry-panel{padding:8px}
+  :root[data-density=compact] .custom-geometry-panel>p,:root[data-density=compact] .custom-geometry-summary,:root[data-density=compact] .custom-geometry-panel>.secondary-button{font-size:11px}
+  :root[data-density=compact] .custom-geometry-panel>p{margin:6px 0;line-height:1.5}
+  :root[data-density=compact] .geometry-mirrors{font-size:11px;gap:8px}
+  :root[data-density=compact] .controls-intro{padding:8px}
+  :root[data-density=compact] .controls-intro h2{font-size:14px}
+  :root[data-density=compact] .controls-intro p{font-size:11px}
+  :root[data-density=compact] .control-card{margin:0 8px 6px;padding:8px}
+  :root[data-density=compact] .control-card-heading>label{font-size:12px}
+  :root[data-density=compact] .control-card input[type=number]{min-width:68px}
+  :root[data-density=compact] .control-binding-status{font-size:11px}
+  :root[data-density=compact] .color-row{gap:6px}
+  :root[data-density=compact] .statusbar{min-height:32px}
+  :root[data-density=compact] .site-navigation a,:root[data-density=compact] #keyboard-help{min-height:32px}
+  :root[data-density=compact] .toast{bottom:calc(46px + env(safe-area-inset-bottom));font-size:11px;padding:8px 10px}
+  :root[data-density=compact] .modal{padding:10px;border-radius:8px}
+  :root[data-density=compact] .modal-heading h2{font-size:17px}
+  :root[data-density=compact] .modal-intro{font-size:11px;line-height:1.5;margin:6px 0 10px}
+  :root[data-density=compact] .form-label,:root[data-density=compact] .source-inputs .form-label,:root[data-density=compact] .surface-inputs .form-label,:root[data-density=compact] .repeat-inputs .form-label{font-size:11px;gap:4px}
+  :root[data-density=compact] .form-label{margin:8px 0}
+  :root[data-density=compact] .modal-actions{bottom:-10px;margin-bottom:-10px;margin-inline:-10px;padding:6px 10px;gap:6px}
+  :root[data-density=compact] .modal-actions>button{font-size:11px;padding:5px}
+  :root[data-density=compact] .shape-option{min-height:54px;font-size:10px;padding:6px 3px;gap:4px}
+  :root[data-density=compact] .shape-option svg{width:22px;height:22px}
+  :root[data-density=compact] .custom-shape-library{gap:6px}
+  :root[data-density=compact] .custom-shape-library button{padding:7px;gap:4px 6px}
+  :root[data-density=compact] .custom-shape-library strong{font-size:11px}
+  :root[data-density=compact] .custom-shape-library small{font-size:10px}
+  :root[data-density=compact] .export-summary{font-size:11px;margin:12px 0 10px;padding:8px}
+  :root[data-density=compact] .export-instructions p{font-size:11px}
+  :root[data-density=compact] .export-source>summary{font-size:12px;padding:8px}
+  :root[data-density=compact] .help-steps h3{font-size:13px}
+  :root[data-density=compact] .help-steps p,:root[data-density=compact] .motion-help{font-size:11px}
+  :root[data-density=compact] .source-preview canvas,:root[data-density=compact] .surface-preview canvas,:root[data-density=compact] .repeat-preview-panel canvas{height:150px}
+  :root[data-density=compact] .source-reference,:root[data-density=compact] .source-preview p,:root[data-density=compact] .surface-preview p,:root[data-density=compact] .repeat-preview-panel p{font-size:11px}
+  :root[data-density=compact] input:not([type=range]):not([type=checkbox]):not([type=color]),:root[data-density=compact] select,:root[data-density=compact] textarea{font-size:12px;padding:4px 6px}
+  :root[data-density=compact] input[type=range]::-webkit-slider-thumb{width:18px;height:18px;margin-top:-7px}
+  :root[data-density=compact] input[type=range]::-moz-range-thumb{width:18px;height:18px}
+  :root[data-density=compact] input[type=checkbox]{width:16px;height:16px}
+  :root[data-density=compact] .control-switch input[type=checkbox]{width:34px;height:19px}
+  :root[data-density=compact] input:not([type=range]):not([type=checkbox]):not([type=color]):focus,:root[data-density=compact] select:focus,:root[data-density=compact] textarea:focus,:root[data-density=compact] .axis-field input:focus,:root[data-density=compact] .property-row input[type=number]:focus,:root[data-density=compact] .source-inputs textarea:focus,:root[data-density=compact] #export-code:focus{font-size:16px}
+  :root .keyboard-open .workspace{grid-template-rows:0 minmax(0,1fr) var(--mobile-nav-height)}
+}
+@media(max-width:1024px) and (min-width:480px) and (orientation:landscape){
+  :root[data-density=compact] .workspace,:root .keyboard-open .workspace{grid-template-rows:minmax(0,1fr) var(--mobile-nav-height)}
 }

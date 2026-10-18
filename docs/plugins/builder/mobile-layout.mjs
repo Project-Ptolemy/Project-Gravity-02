@@ -1,5 +1,14 @@
 /** Keep touch editing within the visible screen, including the software keyboard. */
 export function createMobileLayout(onInspectorTab) {
+  const density = document.getElementById('mobile-density');
+  const densityKey = 'gravity-shape-studio-density';
+  let preferredDensity = 'compact';
+  try { if (localStorage.getItem(densityKey) === 'comfortable') preferredDensity = 'comfortable'; } catch {}
+  document.documentElement.dataset.density = density.value = preferredDensity;
+  density.addEventListener('change', () => {
+    document.documentElement.dataset.density = density.value;
+    try { localStorage.setItem(densityKey, density.value); } catch {}
+  });
   const media = matchMedia('(max-width: 1024px)');
   const workspace = document.querySelector('.workspace');
   const navigation = document.getElementById('mobile-navigation');

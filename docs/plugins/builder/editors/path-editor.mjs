@@ -261,9 +261,13 @@ export function openPathEditor({ path, onApply, minPoints = 2 }) {
     const ys = draft.points.map(point => point[vertical]);
     const lowX = Math.min(...xs), highX = Math.max(...xs), lowY = Math.min(...ys), highY = Math.max(...ys);
     view.x = (lowX + highX) / 2; view.y = (lowY + highY) / 2;
-    // Leave fitted vertices clear of the compact canvas's floating controls.
-    const verticalPadding = compact ? 120 : 86;
-    view.scale = Math.max(0.025, Math.min(250, (width - 86) / Math.max(60, highX - lowX), (height - verticalPadding) / Math.max(60, highY - lowY)));
+    // Fit into the space between the overlays at the current mobile density.
+    const canvasBounds = canvas.getBoundingClientRect();
+    const topInset = compact ? Math.max(24, canvasControls.getBoundingClientRect().bottom - canvasBounds.top + 8) : 43;
+    const bottomInset = compact ? Math.max(24, canvasBounds.bottom - mobileHelp.getBoundingClientRect().top + 8) : 43;
+    const horizontalPadding = compact ? 64 : 86;
+    view.scale = Math.max(0.025, Math.min(250, (width - horizontalPadding) / Math.max(60, highX - lowX), (height - topInset - bottomInset) / Math.max(60, highY - lowY)));
+    view.y += (topInset - bottomInset) / (2 * view.scale);
     render();
   }
   function zoom(factor, at = { x: width / 2, y: height / 2 }) {
