@@ -322,3 +322,6 @@
 @media(max-width:1024px) and (min-width:480px) and (orientation:landscape){
   :root[data-density=compact] .workspace,:root .keyboard-open .workspace{grid-template-rows:minmax(0,1fr) var(--mobile-nav-height)}
 }
+@media(max-width:1024px) and (orientation:portrait){
+  :root[data-density] body:not(.keyboard-open) .workspace{grid-template-rows:calc(var(--app-height,100dvh) / 2) minmax(0,1fr) var(--mobile-nav-height)}
+}

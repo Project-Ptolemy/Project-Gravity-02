@@ -86,8 +86,8 @@ const viewportSizes = [[320, 568], [390, 844], [568, 320], [844, 390], [768, 102
         return [...panel.querySelectorAll('.layer-row')].filter(row => {
           const bounds = row.getBoundingClientRect();
           return bounds.top >= box.top && bounds.bottom <= box.bottom;
-        }).length >= 4;
-      }), `${width}×${height}: initial Layers view shows all four starter layers without scrolling`);
+        }).length >= (innerWidth < innerHeight ? 3 : 4);
+      }), `${width}×${height}: Layers remain visible alongside the portrait half-screen preview`);
       await screenshot('scene');
       if (width > height) {
         const scene = await page.locator('#scene-panel').boundingBox();
