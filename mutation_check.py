@@ -5,22 +5,23 @@ A green suite only means the tests did not fire. This asserts they *would* fire,
 the difference between a test and a comment. Runs entirely inside a throwaway copy of the
 repo under the system temp directory; the real working tree is never modified.
 
-    python3 mutation_check.py        (from anywhere)
+    python mutation_check.py                 (uses Lune on PATH)
+    python mutation_check.py --luau PATH     (standalone Luau CLI)
 
 Every entry below is a real regression somebody could plausibly introduce -- a reverted
 `d.slot`, a clock swapped back to wall time, a change that lands in one tree and not the
 other -- paired with the test that has to notice. A SKIP means the anchor no longer matches
 the source, which is itself a finding: the mutation needs re-aiming at what the code says now.
 """
-import io, os, shutil, subprocess, sys, tempfile
+import argparse, io, os, shutil, subprocess, sys, tempfile
 
 SRC = os.path.dirname(os.path.abspath(__file__))
-WORK = os.path.join(tempfile.gettempdir(), "gravity_mutation")
 
 MUTATIONS = [
     # (label, file, old, new, test that must fail)
     ("shape call reverts to the wall clock", "System.lua",
-     "shape_f2(p, active_c, d, sclock, cur_shape_cfg", "shape_f2(p, active_c, d, ft, cur_shape_cfg",
+     "ShapePhysics.evaluate(shape_f2, p, active_c, d, sclock, cur_shape_cfg",
+     "ShapePhysics.evaluate(shape_f2, p, active_c, d, ft, cur_shape_cfg",
      "tests/formation_lint.lua"),
     ("a shape stops preferring d.slot", "shapes/Halo Ring.lua", None, None, None),  # placeholder, replaced below
     ("SlotMode default is no longer inert", "config.lua",
@@ -76,8 +77,8 @@ MUTATIONS = [
      "table.clear(slot_parts)\n\t\ttable.clear(slot_keys)\n\t\ttable.clear(slot_ids)\n\t\tlocal n = #arr",
      "local n = #arr",
      "tests/formation_lint.lua"),
-    ("only the desktop tree gets the blend guard", "mobilever/System.lua",
-     "pcall(blend_f2, p, active_c, bd, sclock", "blend_f2(p, active_c, bd, sclock",
+    ("the mobile blend skips return-value validation", "mobilever/System.lua",
+     "ShapePhysics.evaluate(blend_f2, p, active_c, bd, sclock", "pcall(blend_f2, p, active_c, bd, sclock",
      "tests/formation_lint.lua"),
     ("only the desktop panel gets Time Scale", "mobilever/UI.lua",
      '"Time Scale", -3, 3', '"Time Scale", -1, 1',
@@ -111,8 +112,8 @@ MUTATIONS = [
     ("the ghost count loses its bounds", "System.lua",
      "want = math.floor(math.clamp(want, 4, 200))", "want = math.floor(want)",
      "tests/formation_smoke.lua"),
-    ("the bare blend call shares the primary's record", "System.lua",
-     "b_delta, b_pure = blend_f2(p, active_c, bd, sclock", "b_delta, b_pure = blend_f2(p, active_c, d, sclock",
+    ("the desktop blend skips return-value validation", "System.lua",
+     "ShapePhysics.evaluate(blend_f2, p, active_c, bd, sclock", "pcall(blend_f2, p, active_c, bd, sclock",
      "tests/formation_lint.lua"),
     ("the resolved blend is no longer published for the preview", "System.lua",
      "x6.bl_f2, x6.bl_cfg, x6.bl_w, x6.bl_s = blend_f2, blend_cfg, blend_base, blend_stag",
@@ -157,50 +158,52 @@ MUTATIONS[1] = ("a shape stops preferring d.slot", "shapes/Mech Suit.lua",
                 "tests/formation_lint.lua")
 
 
-def run(test):
-    p = subprocess.run(["luajit", test], cwd=WORK, capture_output=True, text=True)
+def run(test, work, runner):
+    p = subprocess.run([*runner, test], cwd=work, capture_output=True, text=True,
+                       encoding="utf-8", errors="replace")
     return p.returncode, (p.stdout + p.stderr)
 
 
-def main():
-    if os.path.isdir(WORK):
-        shutil.rmtree(WORK)
-    # Only what the suite reads. The repo root also carries sandbox-mounted dotfiles that
-    # cannot be copied at all, and docs/ and ai/ are not touched by these tests.
-    os.makedirs(WORK)
-    for name in ("config.lua", "main.lua", "System.lua", "System_partctl.lua",
-                 "System_sculptor.lua", "UI.lua", "UI_elements.lua", "ai_chat.lua",
-                 "antifling.lua"):
-        src = os.path.join(SRC, name)
-        if os.path.exists(src):
-            shutil.copy2(src, os.path.join(WORK, name))
-    for d in ("shapes", "shapes-onreview", "tests", "mobilever", "math", "ai"):
+def check_mutations(work, runner):
+    # Copy runtime modules as a group so adding a shared dependency cannot make
+    # the isolated suite fail before it reaches a mutation.
+    for entry in os.scandir(SRC):
+        if entry.is_file() and entry.name.endswith(".lua"):
+            shutil.copy2(entry.path, os.path.join(work, entry.name))
+    for d in ("shapes", "shapes-onreview", "tests", "mobilever", "math", "tools"):
         src = os.path.join(SRC, d)
         if os.path.isdir(src):
-            shutil.copytree(src, os.path.join(WORK, d))
+            shutil.copytree(src, os.path.join(work, d))
 
     # Baseline: the copy has to be green, or a "caught" result proves nothing.
     print("baseline (the copy must be green)")
-    for t in ("tests/formation_lint.lua", "tests/formation_smoke.lua", "tests/shapes_smoke.lua"):
-        rc, out = run(t)
-        print("  %-30s %s  %s" % (os.path.basename(t), "PASS" if rc == 0 else "FAIL", out.strip().splitlines()[-1]))
+    for t in sorted({test for _, _, _, _, test in MUTATIONS} | {"tests/shapes_smoke.lua"}):
+        rc, out = run(t, work, runner)
+        lines = out.strip().splitlines()
+        print("  %-30s %s  %s" % (os.path.basename(t), "PASS" if rc == 0 else "FAIL", lines[-1] if lines else "(no output)"))
         if rc != 0:
+            print(out)
             print("ABORT: baseline is not green")
             return 1
 
     print("\nmutations (each must be caught)")
     caught = missed = 0
     for label, rel, old, new, test in MUTATIONS:
-        path = os.path.join(WORK, rel)
-        original = io.open(path, encoding="utf-8").read()
+        path = os.path.join(work, rel)
+        with io.open(path, encoding="utf-8") as source:
+            original = source.read()
         n = original.count(old)
         if n != 1:
             print("  %-52s SKIP  anchor appears %d times in %s" % (label, n, rel))
             missed += 1
             continue
-        io.open(path, "w", encoding="utf-8").write(original.replace(old, new, 1))
-        rc, out = run(test)
-        io.open(path, "w", encoding="utf-8").write(original)
+        with io.open(path, "w", encoding="utf-8") as changed:
+            changed.write(original.replace(old, new, 1))
+        try:
+            rc, out = run(test, work, runner)
+        finally:
+            with io.open(path, "w", encoding="utf-8") as restored:
+                restored.write(original)
         first = ""
         for line in out.splitlines():
             if "FAIL" in line:
@@ -217,4 +220,28 @@ def main():
     return 0 if missed == 0 else 1
 
 
-sys.exit(main())
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    runtimes = parser.add_mutually_exclusive_group()
+    runtimes.add_argument("--luau", help="path to the standalone Luau CLI")
+    runtimes.add_argument("--lune", help="path to Lune (defaults to Lune on PATH)")
+    options = parser.parse_args()
+    luau = options.luau or (os.environ.get("LUAU") if not options.lune else None)
+    if luau:
+        executable = shutil.which(luau)
+        if not executable:
+            parser.error("cannot find the requested Luau CLI")
+        runner = [sys.executable, "tools/test_luau.py", "--luau", os.path.abspath(executable)]
+    else:
+        executable = shutil.which(options.lune or "lune")
+        if not executable:
+            parser.error("install Lune on PATH or supply --luau PATH")
+        runner = [os.path.abspath(executable), "run", "tools/test_luau.luau"]
+    # A unique directory protects concurrent checks and never removes another
+    # process's scratch files. The copy is cleaned up even when a suite fails.
+    with tempfile.TemporaryDirectory(prefix="gravity-mutation-") as work:
+        return check_mutations(work, runner)
+
+
+if __name__ == "__main__":
+    sys.exit(main())

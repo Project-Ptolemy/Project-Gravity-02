@@ -10,7 +10,7 @@ return function(context)
 
 	local x4, x8 = {}, {}
 	x6.apply_shape_physics = function(p, d)
-		if not x6.torn_down then return ShapePhysics.apply(p, d, x1) end
+		if not x6.torn_down and x6.a[p] == d then return ShapePhysics.apply(p, d, x1) end
 	end
 	x6.refresh_collisions = function()
 		if x6.torn_down then return end
@@ -53,6 +53,21 @@ return function(context)
 	-- Testing notice, so leaving it off the mobile tree took the whole script
 	-- down on any device whose saved shape was still in testing.
 	x8.notify = x7.n
+
+	local function frame_live(core, token)
+		return not x6.torn_down and x6.b == core and core ~= nil and not x1.Paused and not x1.Disabled
+			and x6.physics_running == token and token.revision == (x6.physics_revision or 0)
+	end
+
+	local function physics_error(shape, message)
+		local now = time()
+		x6.physics_error_count = (x6.physics_error_count or 0) + 1
+		x6.physics_error = { shape = shape, message = tostring(message), time = now }
+		if not x6.physics_error_notice or now - x6.physics_error_notice >= 5 then
+			x6.physics_error_notice = now
+			x7.n("Shape error", tostring(shape) .. ": " .. tostring(message):sub(1, 180), 5)
+		end
+	end
 
 	local EXCLUDED_NAMES = {
 		Baseplate = true,
@@ -394,7 +409,8 @@ return function(context)
 	-- The hot loop lives in its own function so the per-frame pcall does not have
 	-- to allocate a fresh closure sixty times a second.
 	local function f3_body(real_dt)
-			local c = x6.b.Position
+			local frame_core, frame_token = x6.b, x6.physics_running
+			local c = frame_core.Position
 			x6.f = x6.f + 1
 			if x6.last_shape ~= x1.k6 then
 				cleanup_shape(x6.last_shape)
@@ -412,6 +428,10 @@ return function(context)
 			end
 			local dt = x6.n > 5000 and 10 or (x6.n > 2500 and 6 or (x6.n > 1000 and 3 or 1))
 			local et, ft = x1.k7 or dt, time()
+			-- Saved settings and plugin writes can bypass the controls. Buckets
+			-- require a positive whole stride or some parts never match a frame.
+			if type(et) ~= "number" or et ~= et or math.abs(et) == math.huge then et = dt end
+			et = math.clamp(math.floor(et), 1, 60)
 			-- Time Scale. Advanced once per frame here and handed to the shapes in place
 			-- of ft at the four shape-facing call sites below; ft itself stays wall time
 			-- for everything that measures a real interval. See advance_clock.
@@ -507,23 +527,39 @@ return function(context)
 			end
 			local shape_name = x1.k6
 			local cur_shape_mod = get_shape(shape_name)
-			if x6.torn_down or not x6.b then return end
+			if not frame_live(frame_core, frame_token) then return end
 			local cur_shape_cfg = x1.S[shape_name] or {}
+			local primary_ready = true
 			if cur_shape_mod and cur_shape_mod.px then
-				cur_shape_mod.px(sclock, cur_shape_cfg, x6, x9, x1)
+				local ok, message = pcall(cur_shape_mod.px, sclock, cur_shape_cfg, x6, x9, x1)
+				if not frame_live(frame_core, frame_token) then return end
+				primary_ready = ok
+				if not ok then
+					physics_error(shape_name, message)
+					-- Stop every primary part immediately, including buckets and
+					-- out-of-range parts this frame would otherwise leave untouched.
+					for _, d in pairs(x6.a) do if not d.pc_mode then ShapePhysics.park(d) end end
+				end
 			end
+			local pc_failed = {}
 			local pc_mods = x6.pc_mods
 			if pc_mods then
 				for mod, _ in pairs(pc_mods) do
 					if mod.px then
-						pcall(mod.px, sclock, mod.pc_cfg_ref or cur_shape_cfg, x6, x9, x1)
+						local ok, message = pcall(mod.px, sclock, mod.pc_cfg_ref or cur_shape_cfg, x6, x9, x1)
+						if not frame_live(frame_core, frame_token) then return end
+						if not ok then
+							pc_failed[mod] = true
+							physics_error("Assigned shape", message)
+						end
 					end
 				end
 			end
 			if x1.k6 ~= shape_name then
 				shape_name = x1.k6
+				primary_ready = true
 				cur_shape_mod = get_shape(shape_name)
-				if x6.torn_down or not x6.b then return end
+				if not frame_live(frame_core, frame_token) then return end
 				cur_shape_cfg = x1.S[shape_name] or {}
 			end
 			local cur_no_damp = no_damp[shape_name]
@@ -537,9 +573,6 @@ return function(context)
 			-- it reads them per part, and the preview reads x6 so a ghost cannot show a
 			-- different field from the one the parts are being driven to.
 			local blend_f2, blend_cfg, blend_base, blend_stag, blend_name = nil, nil, 0, 0, nil
-			-- Whether this frame has already made its one guarded call into the blend
-			-- shape; see the sweep for why that is once a frame and not once a part.
-			local blend_checked = false
 			if x1.BlendEnabled and not (cur_shape_mod and cur_shape_mod.NoBlend) then
 				local bn = x1.BlendShape
 				if type(bn) == "string" and bn ~= "" and bn ~= shape_name and x2[bn] then
@@ -552,7 +585,7 @@ return function(context)
 					-- blend shape is changed, so retrying is a deliberate act.
 					if bw > 0 and bn ~= x6.bl_failed then
 						local bmod = get_shape(bn)
-						if x6.torn_down or not x6.b then return end
+						if not frame_live(frame_core, frame_token) then return end
 						if not (bmod and bmod.f2) then
 							x6.bl_failed = bn
 						end
@@ -567,7 +600,13 @@ return function(context)
 								-- x6.pre["Celestial Ribbon_meta"]), so two shapes' pre-pass
 								-- state cannot collide. That one fact is what lets any pair
 								-- of shapes be blended without a compatibility list.
-								pcall(bmod.px, sclock, blend_cfg, x6, x9, x1)
+								local ok, message = pcall(bmod.px, sclock, blend_cfg, x6, x9, x1)
+								if not frame_live(frame_core, frame_token) then return end
+								if not ok then
+									x6.bl_failed = bn
+									blend_f2 = nil
+									physics_error(bn, message)
+								end
 							end
 						end
 					end
@@ -671,6 +710,8 @@ return function(context)
 			local dt_mult = real_dt * 60 * dt
 
 			local smoothing = (shape_name == "Point Impact" and 1) or x1.k8
+			if type(smoothing) ~= "number" or smoothing ~= smoothing or math.abs(smoothing) == math.huge then smoothing = 0.8 end
+			smoothing = math.clamp(smoothing, 0, 1)
 			if x1.DramaMode and shape_name == "Point Impact" then
 				smoothing = 1
 			end
@@ -730,7 +771,9 @@ return function(context)
 			local is_light_shape = shape_name == "Light Light no Mi"
 			local is_cursed_red = shape_name == "Cursed Technique Red"
 			local always_process = (is_drop_shape or is_self_bounded_shape or max_fid or (cur_shape_mod and cur_shape_mod.AlwaysProcess)) and true or false
-			local base_limit = is_light_shape and 1000 or ((max_speed and not cur_no_damp) and max_speed or 3300)
+			local base_limit = max_speed or 3300
+			if type(base_limit) ~= "number" or base_limit ~= base_limit or base_limit < 0 or base_limit == math.huge then base_limit = 3300 end
+			if is_light_shape then base_limit = math.min(base_limit, 1000) end
 			local check_no3 = (not is_drop_shape) and (not aggressive_claim) and ghp ~= nil
 			local default_damping = not cur_no_damp and math.clamp(damping, 0, 5) or 0
 			local damping_scale = 1 / (1 + default_damping)
@@ -836,6 +879,8 @@ return function(context)
 					local target_pos_delta = ANTI_SLEEP
 					local pure_target_pos = nil
 					local pc = d.pc_mode
+					local part_mod, part_config = d.pc_mod, d.pc_cfg
+					local part_is_point_impact = (pc == nil and is_point_impact) or (pc == "shape" and d.pc_shape == "Point Impact")
 					if pc == "pin" or pc == "manual" then
 						local tgt = d.pc_target or p_pos
 						pure_target_pos = tgt
@@ -858,10 +903,42 @@ return function(context)
 						end
 						target_pos_delta = (tgt - p_pos) * gain
 					elseif pc == "shape" and d.pc_mod and d.pc_mod.f2 then
-						target_pos_delta, pure_target_pos =
-							d.pc_mod.f2(p, active_c, d, sclock, d.pc_cfg or cur_shape_cfg, x1, x6, x9)
+						if pc_failed[d.pc_mod] then ShapePhysics.park(d); continue end
+						local ok
+						ok, target_pos_delta, pure_target_pos =
+							ShapePhysics.evaluate(d.pc_mod.f2, p, active_c, d, sclock, d.pc_cfg or cur_shape_cfg, x1, x6, x9)
+						if not frame_live(frame_core, frame_token) or x1.k6 ~= shape_name then
+							if data[p] == d then reset_scratch(d); ShapePhysics.clear_tracking(d) end
+							return
+						end
+						if data[p] ~= d then continue end
+						if d.pc_mode ~= pc or d.pc_mod ~= part_mod or d.pc_cfg ~= part_config then
+							reset_scratch(d); ShapePhysics.clear_tracking(d)
+							continue
+						end
+						if not ok then
+							physics_error(d.pc_shape or "Assigned shape", target_pos_delta)
+							ShapePhysics.park(d)
+							continue
+						end
 					elseif shape_f2 then
-						target_pos_delta, pure_target_pos = shape_f2(p, active_c, d, sclock, cur_shape_cfg, x1, x6, x9)
+						if not primary_ready then ShapePhysics.park(d); continue end
+						local ok
+						ok, target_pos_delta, pure_target_pos = ShapePhysics.evaluate(shape_f2, p, active_c, d, sclock, cur_shape_cfg, x1, x6, x9)
+						if not frame_live(frame_core, frame_token) or x1.k6 ~= shape_name then
+							if data[p] == d then reset_scratch(d); ShapePhysics.clear_tracking(d) end
+							return
+						end
+						if data[p] ~= d then continue end
+						if d.pc_mode ~= pc or d.pc_mod ~= part_mod or d.pc_cfg ~= part_config then
+							reset_scratch(d); ShapePhysics.clear_tracking(d)
+							continue
+						end
+						if not ok then
+							physics_error(shape_name, target_pos_delta)
+							ShapePhysics.park(d)
+							continue
+						end
 						-- The blend, inline rather than through a shared helper: this is the
 						-- per-part path and the rest of this loop hoists everything it can
 						-- out of it, so the preview keeps its own copy of these fifteen
@@ -892,27 +969,23 @@ return function(context)
 							end
 							local bw = blend_w(blend_base, blend_stag, frac)
 							if bw > 0 then
-								local b_delta, b_pure
-								if blend_checked then
-									b_delta, b_pure = blend_f2(p, active_c, bd, sclock, blend_cfg, x1, x6, x9)
-								else
-									-- One guarded call per frame, then bare ones. A blend shape
-									-- that throws would otherwise take the whole sweep with it
-									-- through f3's pcall: the primary formation stops dead
-									-- because of a shape that is only a passenger, every frame,
-									-- silently. This costs one pcall a frame rather than one per
-									-- part, and turns that into the blend switching itself off
-									-- and saying so.
-									blend_checked = true
-									local blend_ok
-									blend_ok, b_delta, b_pure =
-										pcall(blend_f2, p, active_c, bd, sclock, blend_cfg, x1, x6, x9)
-									if not blend_ok then
-										x6.bl_failed = blend_name
-										x6.bl_f2 = nil
-										x7.n("Blend", tostring(blend_name) .. " errored -- blend off", 4)
-										blend_f2, b_delta, b_pure = nil, nil, nil
-									end
+								local blend_ok, b_delta, b_pure =
+									ShapePhysics.evaluate(blend_f2, p, active_c, bd, sclock, blend_cfg, x1, x6, x9)
+								if not frame_live(frame_core, frame_token) or x1.k6 ~= shape_name then
+									if data[p] == d then reset_scratch(d); ShapePhysics.clear_tracking(d) end
+									return
+								end
+								if data[p] ~= d then continue end
+								if d.pc_mode ~= pc or d.pc_mod ~= part_mod or d.pc_cfg ~= part_config or d.bd ~= bd then
+									reset_scratch(d); ShapePhysics.clear_tracking(d)
+									continue
+								end
+								if not blend_ok then
+									x6.bl_failed = blend_name
+									x6.bl_f2 = nil
+									physics_error(blend_name, b_delta)
+									blend_f2, b_delta, b_pure = nil, nil, nil
+									bw = 0
 								end
 								if b_delta and target_pos_delta then
 									target_pos_delta = target_pos_delta:Lerp(b_delta, bw)
@@ -927,10 +1000,10 @@ return function(context)
 									pure_target_pos = pure_target_pos:Lerp(b_pure, bw)
 								elseif bw >= 1 then
 									pure_target_pos = b_pure
-								else
+								elseif bw > 0 then
 									pure_target_pos = nil
 								end
-								if bd.unclaim then
+								if blend_ok and bd.unclaim then
 									d.unclaim = true
 								end
 							end
@@ -943,6 +1016,12 @@ return function(context)
 					end
 					if d.free_physics or d.free_active or d.collisions ~= nil or d.collision_active or d.angular_velocity ~= nil or d.angular_active then
 						if ShapePhysics.apply(p, d, x1) then continue end
+					end
+					if not ShapePhysics.finite_vector(target_pos_delta)
+						or (pure_target_pos ~= nil and not ShapePhysics.finite_vector(pure_target_pos)) then
+						physics_error(shape_name, "Invalid part target")
+						ShapePhysics.park(d)
+						continue
 					end
 					if vert_mult then
 						target_pos_delta = target_pos_delta * vert_mult
@@ -1031,7 +1110,9 @@ return function(context)
 					-- produced a finite alpha instead of following the target exactly.
 					local cur_sm = sm_alpha
 					local pc_sm = d.pc_phys and d.pc_phys.k8
+					if type(pc_sm) ~= "number" or pc_sm ~= pc_sm or math.abs(pc_sm) == math.huge then pc_sm = nil end
 					if pc_sm then
+						pc_sm = math.clamp(pc_sm, 0, 1)
 						if pc_sm >= 1 or force_smooth then
 							cur_sm = 1
 						else
@@ -1054,35 +1135,29 @@ return function(context)
 						end
 					end
 
-					if is_point_impact then
+					if part_is_point_impact then
 						local impact_delta = active_c - p_pos
 						local id_sq = impact_delta:Dot(impact_delta)
 						-- one sqrt instead of Magnitude's plus Unit's
 						vl = id_sq > 0 and (impact_delta * (10000 / math.sqrt(id_sq))) or ZERO_VECTOR
-					else
-						-- An explicit per-part cap is a cap. The 15300 floor exists so a
-						-- shape that hands back an exact position is not fought by the
-						-- global speed limit, but pin and manual always hand one back, so
-						-- applying it unconditionally made the per-part Max Speed slider
-						-- do nothing in the two modes it is most useful in.
-						local pc_limit = d.pc_phys and d.pc_phys.MaxSpeed
-						local limit = pc_limit or base_limit
-						if pure_target_pos and not pc_limit and not frame_tracking then limit = math.max(limit, 15300) end
-						if liftoff_limit then limit = math.min(limit, liftoff_limit) end
-						local vl_sq = vl:Dot(vl)
-						if vl_sq > limit * limit then
-							vl = vl * (limit / math.sqrt(vl_sq))
-						end
-
-						if water_level then
-							local current_y = p_pos.Y
-							if current_y < water_level then
-								local depth = water_level - current_y
-								vl = Vector3.new(vl.X, math.max(vl.Y, 0) + (depth * 5), vl.Z)
-							end
+					elseif water_level then
+						local current_y = p_pos.Y
+						if current_y < water_level then
+							local depth = water_level - current_y
+							vl = Vector3.new(vl.X, math.max(vl.Y, 0) + (depth * 5), vl.Z)
 						end
 					end
 
+					-- Apply the user's cap last, after exact-target tracking, impact and
+					-- water lift. Every held-part path must obey the same speed setting.
+					local limit = (d.pc_phys and d.pc_phys.MaxSpeed) or base_limit
+					if liftoff_limit then limit = math.min(limit, liftoff_limit) end
+					vl = ShapePhysics.clamp_velocity(vl, limit)
+					if not vl then
+						physics_error(shape_name, "Physics produced a nonfinite velocity")
+						ShapePhysics.park(d)
+						continue
+					end
 					d.vl = vl
 					d.lv.VectorVelocity = vl
 
@@ -1090,7 +1165,7 @@ return function(context)
 						p.AssemblyAngularVelocity = p.AssemblyAngularVelocity * ang_damp_mult
 					end
 
-					if aggressive_claim and not is_point_impact and p.ReceiveAge > 0 then
+					if aggressive_claim and not part_is_point_impact and p.ReceiveAge > 0 then
 						local base_pos = aggressive_root and aggressive_root.Position or active_c
 						if not d.claim_offset then
 							d.claim_offset = Vector3.new(math.sin(d.id) * 20, 15 + (d.id % 15), math.cos(d.id) * 20)
@@ -1132,6 +1207,11 @@ return function(context)
 			-- Max Fidelity nudges every frame. "Enough to keep an assembly awake" is a
 			-- judgement about the engine's sleep heuristic, and this is the switch for
 			-- people who would rather not rely on one.
+			if not x6.physics_paused then
+				x6.physics_paused = true
+				x6.pause_tick = 2
+				for _, d in pairs(x6.a) do ShapePhysics.park(d) end
+			end
 			x6.pause_tick = (x6.pause_tick or 0) + 1
 			if not x1.MaxFidelity and x6.pause_tick % 3 ~= 0 then
 				return
@@ -1148,7 +1228,30 @@ return function(context)
 			end
 			return
 		end
-		pcall(f3_body, real_dt)
+		x6.physics_paused = nil
+		if type(real_dt) ~= "number" or real_dt ~= real_dt or real_dt <= 0 or real_dt == math.huge then return end
+		-- HTTP loading and plugin callbacks can yield. Keep one sweep in flight
+		-- and recheck lifecycle state after callbacks before touching actuators.
+		local running = x6.physics_running
+		local revision = x6.physics_revision or 0
+		if running and running.core == x6.b and running.shape == x1.k6 and running.revision == revision then
+			local record = running.part and x6.a[running.part]
+			if not running.part or (record == running.record and record and record.pc_mode == running.mode
+				and record.pc_mod == running.module and record.pc_cfg == running.config) then return end
+		end
+		local token = { core = x6.b, shape = x1.k6, revision = revision }
+		x6.physics_running = token
+		local ok, message = pcall(f3_body, real_dt)
+		local owns_frame = x6.physics_running == token
+		if owns_frame then x6.physics_running = nil end
+		if x6.torn_down then return end
+		if not ok and owns_frame and x6.b == token.core and x1.k6 == token.shape
+			and (x6.physics_revision or 0) == token.revision then
+			-- Unexpected engine/property failures must never leave old commands
+			-- armed at unlimited force while an invisible error repeats each frame.
+			for _, d in pairs(x6.a) do pcall(ShapePhysics.park, d) end
+			physics_error(x1.k6, message)
+		end
 	end
 
 	function x4.ProcessQueue()
@@ -1324,8 +1427,8 @@ return function(context)
 			p.CustomPhysicalProperties = d.original_properties
 		end
 		if drop_release then
-			p.AssemblyLinearVelocity = (d and d.release_velocity) or ZERO_VECTOR
-			p.AssemblyAngularVelocity = (d and d.release_spin) or ZERO_VECTOR
+			p.AssemblyLinearVelocity = (d and ShapePhysics.finite_vector(d.release_velocity) and d.release_velocity) or ZERO_VECTOR
+			p.AssemblyAngularVelocity = (d and ShapePhysics.finite_vector(d.release_spin) and d.release_spin) or ZERO_VECTOR
 		end
 	end
 
@@ -2119,6 +2222,8 @@ return function(context)
 			p.CustomPhysicalProperties = d.original_properties or PhysicalProperties.new(0.7, 0.5, 0.3, 1, 1)
 		else
 			p.CustomPhysicalProperties = LIGHT_PHYSICS
+		end
+		if not disabled then
 			-- Parts fall while disabled, so every cached smoothing term now
 			-- describes a position they have long since left. d.last_target_pos in
 			-- particular is differentiated against the live target, and dividing a
@@ -2276,6 +2381,7 @@ return function(context)
 			x7.n("Testing", name .. " is still in testing.", 4)
 		end
 		x1.k6 = name
+		x6.physics_revision = (x6.physics_revision or 0) + 1
 		x6.transition_time = time()
 		x6.transition_dur = 1.5
 		-- f3_body clears the rest of the per-part scratch when it notices k6

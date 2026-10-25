@@ -80,6 +80,7 @@ let layerFilter = '', draggedLayer = null;
 let soloState = null;
 const openSections = new Map([['transform', true], ['geometry', true], ['spin', true]]);
 let saveTimer, toastTimer;
+let projectRevision = 0, projectRead = 0;
 const undoStack = [], redoStack = [];
 let historyGroup = null, historyTime = 0;
 const viewport = new Viewport($('viewport'), {
@@ -157,7 +158,7 @@ function persist() {
       : 'Local storage unavailable · download a project to save';
   }
 }
-function changed() { dirty = true; $('save-status').textContent = 'Saving changes…'; clearTimeout(saveTimer); saveTimer = setTimeout(persist, 350); updateHistory(); }
+function changed() { projectRevision++; dirty = true; $('save-status').textContent = 'Saving changes…'; clearTimeout(saveTimer); saveTimer = setTimeout(persist, 350); updateHistory(); }
 function remember(group) {
   const now = performance.now();
   if (!group || group !== historyGroup || now - historyTime > 900) {
@@ -710,13 +711,19 @@ $('screenshot').onclick = () => { viewport.render(); $('viewport').toBlob(blob =
 $('save-project').onclick = saveProject; $('import-project').onclick = () => $('project-file').click();
 $('project-file').onchange = async () => {
   const file = $('project-file').files[0]; if (!file) return;
+  const request = ++projectRead, revision = projectRevision;
   try {
     const imported = await readProjectFile(file);
+    if (request !== projectRead) return;
+    if (revision !== projectRevision) { toast('Project import cancelled because you edited the scene. Choose the file again to open it.'); return; }
     soloState = null; layerFilter = ''; $('layer-search').value = '';
     mutate(() => { project = imported; selectedId = project.layers[0]?.id || null; previewValues = Object.create(null); time = 0; });
     renderAll(); viewport.setPoints(sampleProject(project, time)); viewport.fit(); toast(`${project.name} opened. Your previous project is in Undo.`);
-  } catch (error) { toast(`Could not open project: ${error.message}`); }
-  $('project-file').value = '';
+  } catch (error) {
+    if (request === projectRead && revision === projectRevision) toast(`Could not open project: ${error.message}`);
+  } finally {
+    if (request === projectRead) $('project-file').value = '';
+  }
 };
 $('export').onclick = showExport; $('copy-lua').onclick = copyLua;
 $('download-lua').onclick = () => { download($('export-code').value, safeFilename() + '.lua'); toast('Plugin downloaded. Paste its Lua in game using + Custom shape, or save it in GravityShapes.'); };

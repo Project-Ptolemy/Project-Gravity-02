@@ -115,7 +115,7 @@ local function safe_http_get(url)
 	local success, result = pcall(function()
 		return game:HttpGet(fetch_url)
 	end)
-	if success and result then
+	if success and type(result) == "string" then
 		return result
 	end
 	local req = (type(request) == "function" and request) or (type(http) == "table" and http.request) or (type(syn) == "table" and syn.request)
@@ -123,7 +123,7 @@ local function safe_http_get(url)
 		local s, r = pcall(function()
 			return req({Url = fetch_url, Method = "GET"})
 		end)
-		if s and type(r) == "table" and r.Body then
+		if s and type(r) == "table" and type(r.Body) == "string" then
 			return r.Body
 		end
 	end
@@ -135,11 +135,15 @@ local function load_module(path)
 	local code = safe_http_get(BASE_URL .. path)
 	if getgenv()._GRAVITY_SESSION_ID ~= SESSION_ID then return nil end
 	if code and not string.match(code, "^404: Not Found") then
-		local func, err = loadstring(code)
-		if func then
-			return func()
+		local compiled, func, err = pcall(loadstring, code, path)
+		if compiled and type(func) == "function" then
+			local ran, result = pcall(func)
+			if getgenv()._GRAVITY_SESSION_ID ~= SESSION_ID then return nil end
+			if ran then return result end
+			warn("Error loading module " .. path .. ": " .. tostring(result))
+			return nil
 		end
-		warn("Syntax error in module " .. path .. ": " .. tostring(err))
+		warn("Syntax error in module " .. path .. ": " .. tostring(compiled and err or func))
 		return nil
 	end
 	warn("Failed to download module: " .. path)
@@ -148,68 +152,82 @@ end
 
 local config = load_module("config.lua")
 local plugin_controls = load_module("PluginControls.lua")
+local custom_shapes = load_module("CustomShapes.lua")
 -- load_module returns nil on a failed download or a syntax error, and this is
 -- above the init pcall, so a bare config.x1 threw with the loading spinner still
 -- on screen and its RenderStepped still connected -- no message, no way to clear
 -- it, and _GRAVITY_DESTROY not yet set for a re-execution to clean up.
-if not config or type(config.x1) ~= "table" or type(config.x2) ~= "table" or not plugin_controls then
+if type(config) ~= "table" or type(config.x1) ~= "table" or type(config.x2) ~= "table"
+	or type(plugin_controls) ~= "table" or type(plugin_controls.defaults) ~= "function"
+	or type(custom_shapes) ~= "table" or type(custom_shapes.validate_module) ~= "function"
+	or type(custom_shapes.create) ~= "function" or type(custom_shapes.normalize_source) ~= "function" then
 	if spin_conn then
 		pcall(function() spin_conn:Disconnect() end)
 	end
 	if loading_sg then
 		pcall(function() loading_sg:Destroy() end)
 	end
-	warn("Project Gravity: could not load config.lua -- aborting.")
+	warn("Project Gravity: could not load configuration or shape support -- aborting.")
 	return
 end
 local x1 = config.x1
 local x2 = config.x2
 x1.S = x2
 
-local local_shapes = {}
-if isfolder and makefolder and listfiles and readfile then
-	pcall(function()
-		if not isfolder("GravityShapes") then
-			makefolder("GravityShapes")
+local local_shapes, loaded_shapes = {}, {}
+local function compile_shape(code, name)
+	if getgenv()._GRAVITY_SESSION_ID ~= SESSION_ID then return nil, "Session has ended" end
+	local source, reason = custom_shapes.normalize_source(code)
+	if not source then return nil, reason end
+	local compiled, chunk, err = pcall(loadstring, source, "Shape: " .. name)
+	if not compiled or type(chunk) ~= "function" then
+		return nil, "Lua syntax error: " .. tostring(compiled and err or chunk)
+	end
+	local ran, shape = pcall(chunk)
+	if not ran then return nil, tostring(shape) end
+	local valid, reason = custom_shapes.validate_module(shape)
+	if not valid then return nil, reason end
+	return shape
+end
+
+-- Reading existing plugins does not require permission to create directories.
+-- Validate and cache each module once, including overrides of shipped shapes.
+if type(listfiles) == "function" and type(readfile) == "function" then
+	if type(isfolder) == "function" and type(makefolder) == "function" then
+		local checked, exists = pcall(isfolder, "GravityShapes")
+		if checked and exists == false then pcall(makefolder, "GravityShapes") end
+	end
+	local listed, files = pcall(listfiles, "GravityShapes")
+	if listed and type(files) == "table" then
+		local candidates, names = {}, {}
+		for name in pairs(x2) do names[name:lower()] = name end
+		for _, file in pairs(files) do
+			if type(file) == "string" and (file:lower():match("%.lua$") or file:lower():match("%.txt$")) then
+				candidates[#candidates + 1] = file
+			end
 		end
-		local files = listfiles("GravityShapes")
-		for _, file in ipairs(files) do
-			if string.match(string.lower(file), "%.lua$") or string.match(string.lower(file), "%.txt$") then
-				local name = string.match(file, "([^/\\]+)%.[^%.]+$")
-				if name then
-					local_shapes[name] = file
-					if not x2[name] then
-						-- The slot is claimed only after the module proves it loads.
-						-- Claiming it first left x2[name] as a truthy empty table on every
-						-- failure path, which defeated the k6 repair further down: a local
-						-- shape with a syntax error stayed selected, get_shape returned
-						-- nil, shape_f2 stayed nil, and every claimed part fell through to
-						-- ANTI_SLEEP -- the script grabbed the map and did nothing, which
-						-- is the exact failure that repair exists to prevent. The AI writes
-						-- these files, so a bad one is not a remote possibility.
-						local read_success, code = pcall(readfile, file)
-						local shape_mod
-						if read_success and code then
-							local func = loadstring(code)
-							if func then
-								local load_success, result = pcall(func)
-								if load_success and type(result) == "table" then
-									shape_mod = result
-								end
-							end
-						end
-						if shape_mod then
-							local block = plugin_controls.defaults(shape_mod.Controls)
-							x2[name] = block
-						else
-							warn("Project Gravity: local shape '" .. name .. "' failed to load; skipping it.")
-							local_shapes[name] = nil
-						end
-					end
+		table.sort(candidates) -- stable precedence for duplicate filenames
+		for _, file in ipairs(candidates) do
+			if getgenv()._GRAVITY_SESSION_ID ~= SESSION_ID then break end
+			local name = file:match("([^/\\]+)%.[^%.]+$")
+			if name and not loaded_shapes[name] and (not names[name:lower()] or names[name:lower()] == name) then
+				local read_ok, source = pcall(readfile, file)
+				local shape, reason
+				if read_ok then shape, reason = compile_shape(source, name) else reason = source end
+				if getgenv()._GRAVITY_SESSION_ID ~= SESSION_ID then break end
+				if shape then
+					local block = x2[name] or {}
+					-- An override owns its declared controls, even when a shipped
+					-- control with the same key used a different type or default.
+					for key, value in pairs(plugin_controls.defaults(shape.Controls)) do block[key] = value end
+					x2[name] = block
+					local_shapes[name], loaded_shapes[name], names[name:lower()] = file, shape, name
+				else
+					warn("Project Gravity: local shape '" .. name .. "' was skipped: " .. tostring(reason))
 				end
 			end
 		end
-	end)
+	end
 end
 
 -- Copied all the way down, not one level: x1.Keybinds.Shapes is a table inside a
@@ -346,6 +364,39 @@ end
 local sanitize = serialization.sanitize
 local desanitize = serialization.desanitize
 
+local function read_saved(path)
+	if type(isfile) ~= "function" or type(readfile) ~= "function" then return nil end
+	local ok, value = pcall(function()
+		if not isfile(path) then return nil end
+		return HttpService:JSONDecode(readfile(path))
+	end)
+	if ok and type(value) == "table" then return value end
+	if not ok then warn("Project Gravity: could not read " .. path .. ": " .. tostring(value)) end
+end
+
+local function finite(value)
+	return type(value) == "number" and value == value and value > -math.huge and value < math.huge
+end
+
+local function restore_saved(target, saved)
+	for key, value in pairs(saved) do
+		local current, kind = target[key], typeof(value)
+		if typeof(current) == kind then
+			if kind == "table" then
+				restore_saved(current, value)
+			elseif kind == "number" then
+				-- Unlimited force is intentional; other nonfinite saved numbers must
+				-- not reach control arithmetic or the physics solver.
+				if finite(value) or value == current then target[key] = value end
+			elseif kind == "Vector3" then
+				if finite(value.X) and finite(value.Y) and finite(value.Z) then target[key] = value end
+			elseif kind == "Color3" then
+				if finite(value.R) and finite(value.G) and finite(value.B) then target[key] = value end
+			elseif kind == "string" or kind == "boolean" then target[key] = value end
+		end
+	end
+end
+
 local favorites = {}
 local function save_favs()
 	if writefile then
@@ -355,10 +406,8 @@ local function save_favs()
 	end
 end
 local function load_favs()
-	if isfile and isfile("GravityFavorites.json") then
-		pcall(function()
-			favorites = HttpService:JSONDecode(readfile("GravityFavorites.json"))
-		end)
+	for name, value in pairs(read_saved("GravityFavorites.json") or {}) do
+		if type(name) == "string" and type(value) == "boolean" then favorites[name] = value end
 	end
 end
 load_favs()
@@ -373,27 +422,14 @@ local function save_settings()
 	task.delay(0.5, function()
 		save_pending = false
 		if getgenv()._GRAVITY_SESSION_ID ~= SESSION_ID then return end
-		local data = { x1 = sanitize(x1), x2 = sanitize(x2) }
-		-- x1.S is x2 under another name (line 150) and sanitize recurses into
-		-- tables, so without this every autosave carried a second complete copy of
-		-- all 51 shape blocks -- which load_settings then desanitized and threw away
-		-- at its k ~= "S" test. Doubled the file and the encode cost on every
-		-- slider release.
-		data.x1.S = nil
-		-- Targets, not Tgt. x1.Tgt was replaced by x1.Targets and this line has been
-		-- guarding a key that does not exist; the live targets were kept out only
-		-- because sanitize drops Instance values. TgtActive goes with it, since a
-		-- restored "targeting on" with no targets means nothing.
-		data.x1.Targets = nil
-		data.x1.TgtActive = nil
-		data.x1.IsLaunching = nil
-		-- Paused is live state, not a preference. It persisted, so quitting while
-		-- paused brought the next session up frozen -- and the desktop panel has no
-		-- Paused control at all, only the rebindable P hotkey, so if that was unbound
-		-- there was no way to resume.
-		data.x1.Paused = nil
 		local success, json = pcall(function()
-			return HttpService:JSONEncode(data)
+			local preferences = {}
+			for key, value in pairs(x1) do
+				-- Exclude aliases and live session state before traversing tables.
+				if key ~= "S" and key ~= "Targets" and key ~= "TgtActive"
+					and key ~= "IsLaunching" and key ~= "Paused" then preferences[key] = value end
+			end
+			return HttpService:JSONEncode({ x1 = sanitize(preferences), x2 = sanitize(x2) })
 		end)
 		if success then
 			pcall(function()
@@ -407,29 +443,28 @@ local function save_settings()
 end
 
 local function load_settings()
-	if isfile and isfile("GravitySettings_Auto.json") then
-		local success, data = pcall(function()
-			return HttpService:JSONDecode(readfile("GravitySettings_Auto.json"))
-		end)
-		if success and data then
-			local cx1 = desanitize(data.x1)
-			local cx2 = desanitize(data.x2)
-			for k, v in pairs(cx1) do
-				if k ~= "S" and x1[k] ~= nil and typeof(x1[k]) == typeof(v) then
-					x1[k] = v
-				end
-			end
-			for mk, mv in pairs(cx2) do
-				if x2[mk] and type(mv) == "table" then
-					for sk, sv in pairs(mv) do
-						if x2[mk][sk] ~= nil and typeof(x2[mk][sk]) == typeof(sv) then
-							x2[mk][sk] = sv
-						end
-					end
-				end
-			end
-		end
+	local data = read_saved("GravitySettings_Auto.json")
+	if not data then return end
+	local ok, cx1, cx2 = pcall(function()
+		return desanitize(type(data.x1) == "table" and data.x1 or {}),
+			desanitize(type(data.x2) == "table" and data.x2 or {})
+	end)
+	if not ok then warn("Project Gravity: saved settings are invalid; using defaults."); return end
+	cx1.S, cx1.Targets, cx1.TgtActive, cx1.IsLaunching, cx1.Paused = nil, nil, nil, nil, nil
+	-- These are user-defined collections; preserve valid entries beyond defaults.
+	if type(cx1.k5) == "table" then
+		table.clear(x1.k5)
+		for _, tag in ipairs(cx1.k5) do if type(tag) == "string" then x1.k5[#x1.k5 + 1] = tag end end
+		cx1.k5 = nil
 	end
+	if type(cx1.Keybinds) == "table" and type(cx1.Keybinds.Shapes) == "table" then
+		for name, key in pairs(cx1.Keybinds.Shapes) do
+			if type(name) == "string" and type(key) == "string" then x1.Keybinds.Shapes[name] = key end
+		end
+		cx1.Keybinds.Shapes = nil
+	end
+	restore_saved(x1, cx1)
+	restore_saved(x2, cx2)
 end
 load_settings()
 
@@ -450,53 +485,35 @@ if setfpscap then
 	end)
 end
 
-local loaded_shapes = {}
 local function get_shape(name)
 	if getgenv()._GRAVITY_SESSION_ID ~= SESSION_ID then return nil end
+	if type(name) ~= "string" or not x2[name] then return nil end
 	if not loaded_shapes[name] then
-		local success, result = false, nil
+		local shape, reason
 
 		if local_shapes and local_shapes[name] then
-			local read_success, code = pcall(readfile, local_shapes[name])
-			if read_success and code then
-				local func, err = loadstring(code)
-				if func then
-					success, result = pcall(func)
-				else
-					result = "Syntax error in local shape: " .. tostring(err)
-				end
-			else
-				result = "Failed to read local shape file"
-			end
-		end
-
-		if not success then
+			local read_ok, code = pcall(readfile, local_shapes[name])
+			if read_ok then shape, reason = compile_shape(code, name)
+			else reason = "Failed to read local shape file: " .. tostring(code) end
+		else
 			local url = BASE_URL .. "shapes/" .. HttpService:UrlEncode(name) .. ".lua"
 			local code = safe_http_get(url)
-			-- The 404 test load_module already does. Without it the literal body
-			-- "404: Not Found" went to loadstring and a missing shape was reported as
-			-- a syntax error in its source, which sends you looking in the wrong place.
 			if code and string.match(code, "^404: Not Found") then
 				code = nil
-				result = "Not found on the server"
+				reason = "Not found on the server"
 			end
 			if code then
-				local func, err = loadstring(code)
-				if func then
-					success, result = pcall(func)
-				else
-					result = "Syntax error in shape source: " .. tostring(err)
-				end
-			elseif not result then
-				result = "HTTP Request Failed"
+				shape, reason = compile_shape(code, name)
+			elseif not reason then
+				reason = "HTTP Request Failed"
 			end
 		end
 
 		if getgenv()._GRAVITY_SESSION_ID ~= SESSION_ID then return nil end
-		if success and result then
-			loaded_shapes[name] = result
+		if shape then
+			loaded_shapes[name] = shape
 		else
-			warn("Failed to load shape: " .. tostring(name) .. " Error: " .. tostring(result))
+			warn("Failed to load shape: " .. tostring(name) .. " Error: " .. tostring(reason))
 		end
 	end
 	return loaded_shapes[name]
@@ -793,8 +810,6 @@ local success, err = pcall(function()
 	if not controls_builder then error("Failed to load RuntimeControls") end
 	if x6.torn_down then return end
 	context.controls = controls_builder(context)
-	local custom_shapes = load_module("CustomShapes.lua")
-	if not custom_shapes then error("Failed to load CustomShapes") end
 	if x6.torn_down then return end
 	context.custom_shapes = custom_shapes.create(context)
 

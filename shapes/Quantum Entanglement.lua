@@ -154,9 +154,9 @@ M.Controls = {
 	{ Type = "Slider", Name = "Pair Count", Min = 2, Max = 200, Key = "k11", Default = 50, IntOnly = true },
 	{ Type = "Slider", Name = "Cloud Radius", Min = 20, Max = 500, Key = "k12", Default = 100 },
 	{ Type = "Slider", Name = "Orbit Radius", Min = 50, Max = 1000, Key = "k13", Default = 200 },
-	{ Type = "Slider", Name = "Measure Interval", Min = 1, Max = 20, Key = "k14", Default = 3, Div = 10 },
-	{ Type = "Slider", Name = "Collapse Hold", Min = 1, Max = 10, Key = "k15", Default = 2, Div = 10 },
-	{ Type = "Slider", Name = "Drift Speed", Min = 1, Max = 50, Key = "k16", Default = 5, Div = 10 },
+	{ Type = "Slider", Name = "Measure Interval", Min = 1, Max = 20, Key = "k14", Default = 0.3, Div = 10 },
+	{ Type = "Slider", Name = "Collapse Hold", Min = 1, Max = 10, Key = "k15", Default = 0.2, Div = 10 },
+	{ Type = "Slider", Name = "Drift Speed", Min = 1, Max = 50, Key = "k16", Default = 0.5, Div = 10 },
 }
 
 -- The pair table holds live state machines. Left in x6.pre it survives a shape

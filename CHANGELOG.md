@@ -1,5 +1,14 @@
 # Changelog
 
+## October 25, 2026 - Custom imports and physics reliability
+
+- Completely remove the legacy `ai/` implementation, `ai_chat.lua`, its obsolete tests and tooling references.
+- Add Local file imports for large custom shapes, retain drafts across input modes, reuse reviewed modules, verify saved bytes and register existing matching files without rewriting them.
+- Validate saved and downloaded modules, initialize saved plugins once, support read-only discovery and recover from malformed saved settings. Correct ten slider/toggle defaults across five shipped shapes.
+- Isolate shape callback failures, reject nonfinite vectors, enforce speed limits after all held-part corrections, clear stale tracking on pause/re-enable and serialize yielding physics sweeps on desktop and mobile.
+- Preserve browser edits and newer file selections when asynchronous imports finish late.
+- Expand import, loader, catalog, physics and browser regression coverage; repair mutation-runner isolation and standalone Luau test support.
+
 ## September 29, 2026 - 42 new moving formations
 
 - Add Tsunami's twin curling breakers and Killer's rapid converging rubble volleys from the recommendations sketches.

@@ -135,14 +135,14 @@ for _, mobile in ipairs({ false, true }) do
     click("AddShape")
     check(context.x1.k6 == name and context.loaded_shapes[name] ~= nil and context.x2[name].importRadius == 17,
         mode .. " adds, selects and initializes the pasted shape")
-    check(node("ShapeStatus").Text:find("session", 1, true) ~= nil and getgenv()._CUSTOM_IMPORT_RUNS == 2,
-        mode .. " reports session-only storage and initializes only once per action")
+    check(node("ShapeStatus").Text:find("session", 1, true) ~= nil and getgenv()._CUSTOM_IMPORT_RUNS == 1,
+        mode .. " reports session-only storage and uses the reviewed module without repeating initialization")
     check(node("ShapeAdded").Visible and node("AnotherShape").Visible and node("DoneShapeEditor").Visible
         and not node("AddShape").Active and text_button("  " .. name) ~= nil,
         mode .. " prevents duplicate adds and includes the shape in the rebuilt selector")
     check(slider_value("Import radius") == "17", mode .. " builds the imported module's controls with their defaults")
     click("AddShape")
-    check(getgenv()._CUSTOM_IMPORT_RUNS == 2, mode .. " ignores a second click on the added draft")
+    check(getgenv()._CUSTOM_IMPORT_RUNS == 1, mode .. " ignores a second click on the added draft")
     node("LuaSource"):CaptureFocus()
     click("CloseShapeEditor")
     check(not editor.Visible and not node("LuaSource"):IsFocused(), mode .. " closes the editor and dismisses the keyboard")
@@ -170,6 +170,54 @@ for _, mobile in ipairs({ false, true }) do
     click("AnotherShape")
     check(node("ImportForm").Visible and node("ShapeName").Text == "" and node("LuaSource").Text == "",
         mode .. " starts another import only after an explicit action")
+
+    -- The file route does not put a large export in the Roblox TextBox. Both
+    -- import modes retain their own draft when the user switches or closes.
+    node("LuaSource").Text = "-- retained pasted draft"
+    click("FileSourceMode")
+    check(node("FileSourceGroup").Visible and not node("ShapeCodeScroll").Visible,
+        mode .. " offers a local file route without a Lua text field")
+    local file_name, file_path = "File Orbit " .. mode, "exports/File Orbit " .. mode .. ".lua"
+    node("ShapeFilePath").Text = file_path
+    check(node("ShapeName").Text == file_name, mode .. " suggests the selected filename as its shape name")
+    click("CloseShapeEditor"); click("CustomShapeEntry")
+    check(node("FileSourceGroup").Visible and node("ShapeFilePath").Text == file_path,
+        mode .. " retains file mode and path across closing")
+    click("PasteSourceMode")
+    check(node("LuaSource").Text == "-- retained pasted draft", mode .. " switching modes retains pasted source")
+    click("FileSourceMode")
+    local reader = readfile
+    readfile = nil
+    click("CheckShape")
+    check(node("ShapeStatus").Text:find("cannot read local files", 1, true) and not node("AddShape").Active,
+        mode .. " explains unsupported file reading without registering the draft")
+    readfile = function() error("file unavailable") end
+    click("CheckShape")
+    check(node("ShapeStatus").Text:find("Could not read", 1, true) and node("ShapeFilePath").Text == file_path,
+        mode .. " keeps the path after a read error")
+    readfile = reader
+    files[file_path] = "--" .. string.rep("x", 300 * 1024) .. "\n" .. source
+    local before = getgenv()._CUSTOM_IMPORT_RUNS
+    click("CheckShape")
+    check(node("ShapeReview").Visible and node("ReviewDetails").Text:find("KiB", 1, true)
+        and node("LuaSource").Text == "-- retained pasted draft" and getgenv()._CUSTOM_IMPORT_RUNS == before + 1,
+        mode .. " reviews a large file directly without replacing or truncating the pasted draft")
+    click("AddShape")
+    local copied_path = "GravityShapes/" .. file_name .. ".lua"
+    check(context.x1.k6 == file_name and files[copied_path] == files[file_path]:match("^%s*(.-)%s*$") and written() == 2
+        and getgenv()._CUSTOM_IMPORT_RUNS == before + 1,
+        mode .. " copies and activates the complete reviewed file once")
+    click("AnotherShape")
+    local existing_name = "Existing file " .. mode
+    local existing_path = "GravityShapes/" .. existing_name .. ".lua"
+    files[existing_path] = source
+    node("ShapeFilePath").Text = existing_path
+    click("CheckShape")
+    check(node("ReviewStorage").Text:find("existing file", 1, true), mode .. " explains in-place import before adding")
+    click("AddShape")
+    check(context.x1.k6 == existing_name and context.local_shapes[existing_name] == existing_path and written() == 2,
+        mode .. " activates a newly placed GravityShapes file without rewriting it or restarting")
+    click("AnotherShape"); click("PasteSourceMode")
 
     getclipboard = function() return "-- Project Gravity Shape Builder \194\183 Clipboard Orbit\n" .. source end
     click("CloseShapeEditor"); click("CustomShapeEntry")
@@ -299,6 +347,23 @@ do
     end
     editor.open(); click("PasteShape")
     check(node("LuaSource").Text == "-- text entered during clipboard read", "a delayed clipboard read cannot replace newer text")
+    click("FileSourceMode")
+    node("ShapeFilePath").Text = "exports/Before.lua"
+    local file_validations = 0
+    context.custom_shapes.validate = function()
+        file_validations = file_validations + 1
+        error("stale file must not initialize")
+    end
+    readfile = function()
+        check(not node("ShapeFilePath").TextEditable, "file reads lock the source path until completion")
+        node("ShapeFilePath").Text = "exports/After.lua"
+        return source
+    end
+    click("CheckShape")
+    check(file_validations == 0 and node("ShapeFilePath").Text == "exports/After.lua"
+        and node("ShapeStatus").Text:find("changed", 1, true) and not node("AddShape").Active,
+        "a file read belonging to an older path cannot initialize or review the new draft")
+    readfile = nil
     gui:Destroy()
     for _, signal in pairs(keyboardSignals) do check(signal:count() == 0, "direct editor destruction releases keyboard listeners") end
 end

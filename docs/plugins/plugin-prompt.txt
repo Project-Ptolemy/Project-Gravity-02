@@ -1,7 +1,7 @@
 Create a custom Project Gravity shape plugin in Roblox Luau from the brief at the end. Return one complete .lua module, its filename, and a short controls note. It must work on desktop and mobile with the current runtime. Do not invent APIs or install dependencies.
 
 INSTALLATION
-In game, open the shape selector, choose + Custom shape, enter a name, paste the full module, and click Add & use. The editor saves to GravityShapes/<Shape Name>.lua when local file storage is available. Alternatively, save the file in that folder and run/re-run Project Gravity. Return a module table, not a standalone loop or another UI.
+In game, open the shape selector, choose + Custom shape, enter a name, and either paste the full module or choose Local file and enter its path in the executor's workspace. Choose Review shape, then Add & use. Review initializes the module once; Add reuses it. The editor saves to GravityShapes/<Shape Name>.lua when local file storage is available. A new matching file already in GravityShapes can be registered without rewriting it or restarting. Return a module table, not a standalone loop or another UI.
 
 MODULE CONTRACT
 local M = {}
@@ -22,6 +22,8 @@ return M
 
 p is a BasePart; cen is the current center (which can move or follow a target); d is its persistent record; c contains this shape's control values by Key. x1 is global settings, x6 is runtime state, and x9 contains runtime constants. The first f2 result is a velocity correction, not a force. Return the exact target position as the second result for moving-target tracking. Do not use arbitrary huge feedback gains.
 
+Both returned vectors must be finite. Invalid results park the affected part and report an error; failed blends fall back to the primary shape. Global Max Speed (or an explicit per-part override) caps every final held-part velocity, including exact-target tracking, Point Impact and water lift. Keep px/f2 callbacks nonyielding. Module initialization should not create persistent side effects; initialize owned runtime state in px.
+
 Use d.slot or d.id or 1 for deterministic placement. d.slot_n is the optional formation slot count; x6.n is the held count. Parts arrive late and are processed in buckets: f2 is not necessarily called every frame. Advance shared clocks in px. For timed per-part actions, capture the shared clock and subtract it later instead of adding one frame's dt per f2 call. Account for mixed part dimensions.
 
 t is formation time and can pause, slow down or reverse. d.claim_t is wall time: do not subtract it from t. Initialize timestamps on first px without a huge startup delta. Keep per-part data in d.my_shape and give it an owner reference to x6.pre[NAME], so cleanup/re-entry invalidates stale records. Cache shared trig, paths and frames in px. Do not reroll assignments every frame. Keep results finite at zero size/speed, vertical directions, path turnarounds and all control limits.
@@ -41,6 +43,8 @@ end }
 Buttons run once per click/tap, never during UI construction. Their Key is optional; there is no button value in c or saved settings. Use real Buttons for actions rather than flipping Toggles. Callbacks should finish quickly without yielding or spawning permanent loops. Errors are caught and reported. A second click is ignored while a callback is still running.
 
 Slider Min/Max are display units; Default is already in stored units. Div=10 and Default=1.6 display 16, and the shape reads 1.6. IntOnly rounds the display. Labels containing "speed" get an extended maximum unless ExactMax=true. Clamp your math to supported ranges. Missing Toggle/TextBox defaults become false/empty string. Built-in shapes need matching non-button defaults in config.lua; local imports get defaults from Controls.
+
+Every control Key must be unique. Slider bounds and scaled values must be finite, Div must be positive, and Default must fit the displayed range. Optional px and cleanup members must be functions.
 
 OPTIONAL FLAGS AND PHYSICS ACTIONS
 M.ContinuousMotion=true opts into the shared real-time drift. Add x6.motion_offset to the final target when present; the drift continues when formation time is frozen.

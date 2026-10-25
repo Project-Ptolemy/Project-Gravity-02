@@ -76,10 +76,10 @@ end
 
 M.Controls = {
 	{ Type = "Slider", Name = "Radius Spread", Min = 50, Max = 1500, Key = "k11", Default = 400 },
-	{ Type = "Slider", Name = "Spin Speed", Min = 0, Max = 20, Key = "k12", Div = 10, Default = 2 },
-	{ Type = "Slider", Name = "Drift Speed", Min = 0, Max = 10, Key = "k13", Default = 1 },
+	{ Type = "Slider", Name = "Spin Speed", Min = 0, Max = 20, Key = "k12", Div = 10, Default = 10 },
+	{ Type = "Slider", Name = "Drift Speed", Min = 0, Max = 10, Key = "k13", Default = 5 },
 	{ Type = "Slider", Name = "Web Height Limit", Min = 0, Max = 1500, Key = "k24", Default = 200 },
-	{ Type = "Toggle", Name = "Cut In Half", Key = "k23", Default = true }
+	{ Type = "Toggle", Name = "Cut In Half", Key = "k23", Default = false }
 }
 
 

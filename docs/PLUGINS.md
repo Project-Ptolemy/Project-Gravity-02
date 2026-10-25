@@ -4,7 +4,9 @@
 
 In game, open the shape selector, choose **+ Custom shape**, enter a name, and paste the complete Lua module. Choose **Review shape** to check the module and inspect its name, controls and storage information, then **Add & use** to import and select it. This works on desktop and mobile with Shape Studio's **Copy Lua** export and other compatible shape scripts. **Back** lets you edit before adding, and closing the window keeps your draft for this session. Existing names are kept; choose a new name for each import.
 
-The editor saves the script as `GravityShapes/<Shape Name>.lua` when the executor supports local file storage. If saving is unavailable or fails, it reports that the shape is available for this session only. You can also put a module in that folder yourself and run Project Gravity again. Both **Review shape** and **Add & use** run the module's initialization, just like loading a local plugin; the checks do not simulate its physics.
+Choose **Local file** to import a saved Lua file by its path in your executor's workspace. This supports large exports without the text box's paste limit. A new matching `GravityShapes/<Shape Name>.lua` or `.txt` file can be registered directly without rewriting it or restarting; changing that file after review requires another review. Files elsewhere are copied under the chosen name.
+
+The editor saves pasted scripts as `GravityShapes/<Shape Name>.lua` when the executor supports local file storage and verifies the saved bytes when reading is available. If saving is unavailable or fails, it reports that the shape is available for this session only. **Review shape** runs the module's initialization once; **Add & use** reuses the reviewed module. The checks validate the module contract and controls, not its simulated physics. Keep initialization free of persistent side effects and create owned runtime state in `px`.
 
 The **PROJECT UAI** button launches [Project UAI](https://github.com/CarlDV/ProjectUAI) on demand; you can also take the prompt above to another AI.
 
@@ -45,6 +47,10 @@ return M
 
 The first result is a **velocity correction**; the second is the **exact target position** used for tracking. Avoid arbitrary huge multipliers. Cache frame-wide calculations in `px`; derive center-dependent positions in `f2`, since `px` does not receive `cen`.
 
+Return finite `Vector3` values. A failed `f2` call or invalid vector parks the affected part and reports an error without aborting other parts. A failed `px` skips that module's part updates for the frame; a failed blend falls back to the primary shape. Callbacks should finish without yielding. The engine allows only one physics sweep at a time and checks lifecycle state when a callback returns.
+
+The global **Max Speed**, or an explicit per-part override, caps the final held-part velocity after tracking, Point Impact and water lift. Exact target positions do not bypass it. Released parts follow Roblox physics and retain their separately requested impulses.
+
 Use `d.slot or d.id or 1` for stable placement and `d.slot_n` for an optional sorted slot count. Parts arrive late and may only be processed every few frames. Timed actions should subtract a captured shared timestamp instead of adding one frame's delta on every `f2` call. `d.claim_t` is wall time, so do not subtract it from scaled `t`.
 
 Own one namespaced `x6.pre[NAME]` entry and remove it in cleanup. Give private per-part records an owner reference to that shared state so a fresh state invalidates old records on re-entry. Cleanup can run more than once, including during failed initialization.
@@ -68,6 +74,8 @@ end }
 Each click/tap runs the callback once. Building or refreshing the panel never invokes it. Buttons do not create entries in `c` or saved settings. Use them for actions, and Toggles for persistent on/off preferences. Callbacks should finish quickly without yielding; errors are contained and reported, and a second click cannot duplicate an in-progress callback.
 
 Slider Min/Max are in display units; Default is already in stored units. For `Div = 10, Default = 1.6`, the panel displays **16** and the shape reads **1.6**. IntOnly rounds the display. A label containing “speed” extends its maximum by 300 unless `ExactMax = true`. Clamp your math to its supported range. Built-in modules need matching non-button defaults in config.lua; local imports use Controls.
+
+Control keys must be unique. Slider bounds and their scaled values must remain finite, `Div` must be positive, and defaults must fit the displayed range. Optional `px` and `cleanup` members must be functions. Pasted, local-file and downloaded modules use the same validation.
 
 ## Natural release and impulses
 

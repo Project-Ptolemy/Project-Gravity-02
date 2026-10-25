@@ -13,7 +13,7 @@ Project Gravity is a Roblox script that grabs unanchored parts and moves them ar
   tag or distance
 - Saves your settings automatically
 - Shape plugins support real action buttons and circular mobile steering
-- Add custom shapes in game: paste a Lua shape script, name it, and use it immediately
+- Add custom shapes in game: paste Lua or open a local file, review it, and use it immediately
 - The UI's **X** fully unloads the session, including the core, constraints and keybinds
 
 ### Thirty vast formations
@@ -154,12 +154,24 @@ This works on desktop and mobile, including compatible Lua shape scripts from
 other sources. Closing the editor keeps your draft for this session. Existing
 shape names cannot be overwritten.
 
+For a downloaded or large script, choose **Local file** in the same editor and
+enter its path in your executor's workspace. Review reads the whole file without
+putting it in the text box. A new file already in `GravityShapes` can be added
+directly without restarting or rewriting it. Review initializes the module once;
+**Add & use** reuses that reviewed module. Drafts are retained for both input modes.
+
 Imports appear in the shape list immediately. When your executor supports local
 file storage, the script is saved to `GravityShapes/<name>.lua` for future sessions;
 otherwise the editor reports that it is available for this session only. You can
 also save an exported `.lua` file in `GravityShapes` and restart Project Gravity.
 The preview is a geometry editor; Roblox's live
 physics, network ownership and available debris affect the in-game result.
+
+**Max Speed** now caps every held-part velocity, including exact-target shapes,
+Point Impact and water lift. Per-part speed overrides still take precedence.
+Fast formations may need a higher setting to reach their intended motion.
+Malformed shape results stop the affected part and show an error while other
+parts continue; pause and resume clear stale tracking to avoid sudden jumps.
 
 The optional browser suites run the editor in headless Chromium. Install
 Playwright in a separate tools directory, then point the suite at that package:
@@ -233,6 +245,8 @@ python tools/test_luau.py --luau PATH_TO_LUAU tests/session_lifecycle.lua
 python tools/test_luau.py --luau PATH_TO_LUAU tests/uai_integration.lua
 python tools/test_luau.py --luau PATH_TO_LUAU tests/custom_shapes.lua
 python tools/test_luau.py --luau PATH_TO_LUAU tests/custom_shape_editor.lua
+python tools/test_luau.py --luau PATH_TO_LUAU tests/loader_shapes.lua
+python tools/test_luau.py --luau PATH_TO_LUAU tests/physics_robustness.lua
 python tools/test_luau.py --luau PATH_TO_LUAU tests/insane_shapes_smoke.lua
 python tools/test_luau.py --luau PATH_TO_LUAU tests/math_curves_smoke.lua
 python tools/test_luau.py --luau PATH_TO_LUAU tests/formation_smoke.lua

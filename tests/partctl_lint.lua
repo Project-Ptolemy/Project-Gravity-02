@@ -42,8 +42,8 @@ for _, path in ipairs({ "System.lua", "mobilever/System.lua" }) do
 	-- Part Control must not disturb. It used to name the clock argument too, which made
 	-- it fail on Time Scale renaming that local from ft to sclock: an unrelated feature
 	-- breaking a Part Control check tells you nothing about Part Control.
-	check(src:find("shape_f2%(p,%s*active_c,%s*d,%s*[%w_]+,%s*cur_shape_cfg") ~= nil,
-		path .. ": the normal path still calls shape_f2 unchanged")
+	check(src:find("ShapePhysics%.evaluate%(shape_f2,%s*p,%s*active_c,%s*d,%s*[%w_]+,%s*cur_shape_cfg") ~= nil,
+		path .. ": the normal path guards shape_f2 with the same arguments")
 
 	check(src:find("x6%.pc_mods") ~= nil, path .. ": the loop walks the assigned-module registry")
 	check(src:find("mod%.px") ~= nil or src:find("m%.px") ~= nil,

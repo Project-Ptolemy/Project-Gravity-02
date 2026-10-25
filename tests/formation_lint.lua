@@ -113,11 +113,11 @@ for _, path in ipairs({ "System.lua", "mobilever/System.lua" }) do
 	has("scale < %-8", "and down, since a hand-edited settings file is not the slider")
 	has("scale ~= scale", "and NaN is caught, because it fails its own equality test")
 	-- The four shape-facing sites, all of which have to be on the scaled clock.
-	has("cur_shape_mod%.px%(sclock", "the primary shape's pre-pass runs on the shape clock")
+	has("pcall%(cur_shape_mod%.px, sclock", "the primary shape's pre-pass runs on the shape clock")
 	has("pcall%(mod%.px, sclock", "so does each assigned module's")
 	has("pcall%(bmod%.px, sclock", "and the blend shape's")
-	has("d%.pc_mod%.f2%(p, active_c, d, sclock", "a Part Control shape runs on the shape clock")
-	has("shape_f2%(p, active_c, d, sclock", "and so does the formation")
+	has("ShapePhysics%.evaluate%(d%.pc_mod%.f2, p, active_c, d, sclock", "a Part Control shape runs on the shape clock")
+	has("ShapePhysics%.evaluate%(shape_f2, p, active_c, d, sclock", "and so does the formation")
 	-- The wall-clock sites, all of which have to be left alone. A Time Scale of 0 that
 	-- also froze these would stop the target list rebuilding and the shape-switch ease
 	-- finishing, which is not what the control says it does.
@@ -130,20 +130,19 @@ for _, path in ipairs({ "System.lua", "mobilever/System.lua" }) do
 	has("x1%.BlendEnabled", "reads the blend toggle")
 	has("bn ~= shape_name", "refuses to blend a shape with itself")
 	has("bd = { id = d%.id, integral = ZERO_VECTOR }", "gives the blend shape its own scratch record")
-	has("blend_f2%(p, active_c, bd, sclock", "and calls it with that record, not with d")
-	hasnt("blend_f2%(p, active_c, d,", "never hands the blend shape the primary's record")
+	has("ShapePhysics%.evaluate%(blend_f2, p, active_c, bd, sclock", "and calls it with that record, not with d")
+	hasnt("ShapePhysics%.evaluate%(blend_f2, p, active_c, d,", "never hands the blend shape the primary's record")
 	has("x6%.bl_f2, x6%.bl_cfg, x6%.bl_w, x6%.bl_s", "publishes the resolved blend for the preview")
-	has("if bd%.unclaim then", "a blend shape can still release a part")
+	has("if blend_ok and bd%.unclaim then", "a blend shape can still release a part")
 	has("x6%.last_blend", "tracks the blend shape so it can be handed its instances back")
 	has("prev_blend ~= shape_name", "but never tears down the shape that is now primary")
 	has("elseif bw >= 1 then", "a pure target survives only at full weight or from both shapes")
-	-- A blend shape is a passenger. If it throws, f3's pcall swallows it and the *primary*
-	-- formation stops dead for that frame -- every frame, with nothing said. One guarded
-	-- call per frame is what turns that into the blend switching itself off.
-	has("local blend_checked = false", "the frame tracks its one guarded call into the blend")
-	has("pcall%(blend_f2, p, active_c, bd, sclock", "which is a guarded call")
+	-- Every blend invocation is guarded: a later part can fail after the first
+	-- succeeds. physics_robustness.lua exercises that case through Heartbeat.
+	hasnt("local blend_checked", "there is no unguarded blend fast path")
+	has("ShapePhysics%.evaluate%(blend_f2, p, active_c, bd, sclock", "every blend call is guarded")
 	has("x6%.bl_failed", "and a blend shape that fails is remembered rather than retried")
-	has('x7%.n%("Blend"', "and the failure is announced")
+	has("physics_error%(blend_name", "and the failure is announced")
 
 	-- Formation Preview.
 	has("GRV_GHOST = true", "the ghost name is in EXCLUDED_NAMES")

@@ -1,4 +1,6 @@
 -- Every Controls entry must have a config.lua default of the matching final type.
+-- Explicit module defaults must also match so importing the same module under a
+-- custom name does not silently start it with different settings.
 --
 -- load_settings (main.lua) only restores a saved value when a default of the
 -- same type already exists, and reset_config only restores what it snapshotted
@@ -73,6 +75,9 @@ for _, name in ipairs(names) do
 							problems = problems + 1
 						elseif type(got) ~= want then
 							print(("TYPE         %-26s %-5s want %s, got %s"):format(name, ctl.Key, want, type(got)))
+							problems = problems + 1
+						elseif ctl.Default ~= nil and got ~= ctl.Default then
+							print(("DEFAULT      %-26s %-5s config %s, module %s"):format(name, ctl.Key, tostring(got), tostring(ctl.Default)))
 							problems = problems + 1
 						end
 					end

@@ -45,6 +45,41 @@ const server = http.createServer((request, response) => {
     const initialLayers = await page.locator('#layers .layer-row').count();
     const [initialDownload] = await Promise.all([page.waitForEvent('download'), page.locator('#save-project').click()]);
     const initialBytes = fs.readFileSync(await initialDownload.path());
+    const races = await page.evaluate(async initialText => {
+      const input = document.querySelector('#project-file');
+      const projectText = name => JSON.stringify({ ...JSON.parse(initialText), name });
+      const start = text => {
+        Object.defineProperty(input, 'files', { configurable: true, value: [{ size: 100, text }] });
+        return input.onchange();
+      };
+      try {
+        let finishOld;
+        const old = start(() => new Promise(resolve => { finishOld = resolve; }));
+        await start(async () => projectText('Newest selection'));
+        finishOld(projectText('Stale selection')); await old;
+        const latest = document.querySelector('#project-name').value;
+        document.querySelector('#undo').click();
+        const undoName = document.querySelector('#project-name').value;
+
+        let rejectOld;
+        const failed = start(() => new Promise((_, reject) => { rejectOld = reject; }));
+        await start(async () => projectText('Newest after failure'));
+        rejectOld(new Error('An obsolete read failed')); await failed;
+        const notice = document.querySelector('#toast').textContent;
+
+        let finishEdited;
+        const pending = start(() => new Promise(resolve => { finishEdited = resolve; }));
+        const name = document.querySelector('#project-name');
+        name.value = 'Edited while reading'; name.dispatchEvent(new Event('change'));
+        finishEdited(projectText('Do not overwrite edits')); await pending;
+        return { latest, undoName, notice, edited: name.value, cancelled: document.querySelector('#toast').textContent };
+      } finally { delete input.files; }
+    }, initialBytes.toString('utf8'));
+    assert.equal(races.latest, 'Newest selection', 'a slow older file cannot replace the latest selected project');
+    assert.equal(races.undoName, initialName, 'a discarded read does not add an undo step');
+    assert.match(races.notice, /Newest after failure opened/, 'a stale failure cannot replace the latest import status');
+    assert.equal(races.edited, 'Edited while reading', 'edits made during file reading remain intact');
+    assert.match(races.cancelled, /import cancelled/);
     await page.locator('#project-file').setInputFiles({ name: 'initial.gravity.json', mimeType: 'application/json', buffer: initialBytes });
     await page.waitForFunction(() => document.querySelector('#save-status').textContent === 'All changes saved locally');
 

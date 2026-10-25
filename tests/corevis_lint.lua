@@ -39,7 +39,7 @@ for _, path in ipairs({ "System.lua", "mobilever/System.lua" }) do
 	check(src:find("local function refresh_core_visual%(%)") ~= nil,
 		path .. ": the visibility rule has one owner")
 	check(src:find("x4%.refresh_core_visual%s*=%s*refresh_core_visual") ~= nil,
-		path .. ": it is published for the UI and the AI tool")
+		path .. ": it is published for the UI and runtime controls")
 
 	-- Disabled has to keep hiding it, and the pause reason is additive.
 	check(src:find("x1%.Disabled%s+or%s+%(x1%.HideCoreOnPause%s+and%s+x1%.Paused%)") ~= nil,
@@ -100,15 +100,22 @@ for _, path in ipairs({ "UI.lua", "mobilever/UI.lua" }) do
 end
 
 do
-	local src = slurp("ai/tools/engine.lua")
-	-- adjust_gravity writes x1 fields straight through, so paused needs the same
-	-- apply hook disabled already has.
-	local spec = src:match('{ arg = "paused".-}')
-	check(spec ~= nil, "engine.lua still exposes paused")
-	check(spec == nil or spec:find("refresh_core_visual") ~= nil,
-		"engine.lua: setting paused repaints the core")
-	check(src:find('arg = "hide_core_on_pause"') ~= nil,
-		"engine.lua: the AI can read and set the toggle")
+	-- External integrations use the shared runtime effects, including changes
+	-- to false: unpausing must repaint just as reliably as pausing.
+	local refreshes = 0
+	local context = {
+		x1 = {}, x6 = {},
+		x4 = { refresh_core_visual = function() refreshes = refreshes + 1 end },
+	}
+	local controls = assert(loadfile("RuntimeControls.lua"))()(context)
+	for _, changed in ipairs({ { Paused = true }, { Paused = false },
+		{ HideCoreOnPause = true }, { HideCoreOnPause = false } }) do
+		local before = refreshes
+		controls.apply_settings(changed)
+		check(refreshes == before + 1, "runtime pause and visibility changes repaint the core")
+	end
+	controls.apply_settings({})
+	check(refreshes == 4, "unrelated runtime changes do not repaint the core")
 end
 
 print(("\n%d checks, %d failures"):format(checks, fails))

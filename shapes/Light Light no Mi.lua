@@ -123,7 +123,7 @@ function M.f2(p, cen, d, t, c, x1, x6, x9)
 end
 
 M.Controls = {
-	{ Type = "Slider", Name = "Containment Radius", Min = 25, Max = 800, Key = "k11", Default = 300 },
+	{ Type = "Slider", Name = "Containment Radius", Min = 25, Max = 800, Key = "k11", Default = 150 },
 	{ Type = "Slider", Name = "Light Speed", Min = 50, Max = 1000, Key = "k12", ExactMax = true },
 	{ Type = "Slider", Name = "Beam Count", Min = 1, Max = 20, Key = "k14", Default = 2, IntOnly = true },
 	{ Type = "Slider", Name = "Beam Spacing", Min = 1, Max = 20, Key = "k13" },

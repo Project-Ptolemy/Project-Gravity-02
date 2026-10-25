@@ -14,6 +14,7 @@ return function(context, parent)
 		success = Color3.fromRGB(80, 255, 150),
 	}
 	local touch = context.is_mobile or (inputService and inputService.TouchEnabled) or false
+	local sourceMode = "paste"
 	local connections, closed = {}, false
 	local function connect(signal, callback)
 		local connection = signal:Connect(callback)
@@ -162,8 +163,15 @@ return function(context, parent)
 	local sourceGroup = stack("SourceGroup", form, 2, 8)
 	local sourceLabel = label("SourceLabel", sourceGroup, "LUA SCRIPT", 10, 1)
 	sourceLabel.TextColor3, sourceLabel.Font = colors.text, Enum.Font.GothamBold
+	local sourceModes = create("Frame", "ImportSourceMode", sourceGroup, {
+		BackgroundTransparency = 1, Size = UDim2.new(1, 0, 0, touch and 44 or 36), LayoutOrder = 2, ZIndex = 203,
+	})
+	local pasteMode = button("PasteSourceMode", sourceModes, "Paste Lua")
+	pasteMode.Size = UDim2.new(0.5, -4, 1, 0)
+	local fileMode = button("FileSourceMode", sourceModes, "Local file")
+	fileMode.Position, fileMode.Size = UDim2.new(0.5, 4, 0, 0), UDim2.new(0.5, -4, 1, 0)
 	local pasteActions = create("Frame", "PasteActions", sourceGroup, {
-		BackgroundTransparency = 1, Size = UDim2.new(1, 0, 0, touch and 44 or 32), LayoutOrder = 2, ZIndex = 203,
+		BackgroundTransparency = 1, Size = UDim2.new(1, 0, 0, touch and 44 or 32), LayoutOrder = 3, ZIndex = 203,
 	})
 	local paste = button("PasteShape", pasteActions, "Paste clipboard")
 	paste.Size = UDim2.new(0.62, -4, 1, 0)
@@ -176,13 +184,21 @@ return function(context, parent)
 		BackgroundColor3 = colors.field, BorderSizePixel = 0, Size = UDim2.new(1, 0, 0, 200),
 		AutomaticCanvasSize = Enum.AutomaticSize.Y, CanvasSize = UDim2.new(0, 0, 0, 0),
 		CanvasPosition = Vector2.new(0, 0), ScrollingDirection = Enum.ScrollingDirection.Y,
-		ScrollBarThickness = 5, ScrollBarImageColor3 = colors.muted, Active = true, LayoutOrder = 3, ZIndex = 203,
+		ScrollBarThickness = 5, ScrollBarImageColor3 = colors.muted, Active = true, LayoutOrder = 4, ZIndex = 203,
 	})
 	round(codeScroll); padding(codeScroll, 10)
 	local sourceOutline = create("UIStroke", "FieldOutline", codeScroll, { Color = colors.line, Thickness = 1 })
 	local luaSource = field("LuaSource", codeScroll, touch and "Press and hold to paste your Lua export." or "Paste your complete Lua export here.", true)
 	luaSource.AutomaticSize, luaSource.BackgroundTransparency = Enum.AutomaticSize.Y, 1
-	local sourceInfo = label("ShapeSourceInfo", sourceGroup, "No script pasted yet", 11, 4)
+	local fileGroup = stack("FileSourceGroup", sourceGroup, 4, 8)
+	fileGroup.Visible = false
+	local filePath = field("ShapeFilePath", fileGroup, "e.g. GravityShapes/My formation.lua", false)
+	filePath.LayoutOrder = 1
+	round(filePath); padding(filePath, 10)
+	local fileOutline = create("UIStroke", "FileOutline", filePath, { Color = colors.line, Thickness = 1, ApplyStrokeMode = Enum.ApplyStrokeMode.Border })
+	local fileHelp = label("FileSourceHelp", fileGroup,
+		"Enter a Lua file path in your executor's workspace. Large exports load directly without pasting or restarting.", 12, 2)
+	local sourceInfo = label("ShapeSourceInfo", sourceGroup, "No script pasted yet", 11, 5)
 	local review = stack("ShapeReview", body, 2, 12)
 	review.Visible = false
 	local function card(name, owner, order)
@@ -233,6 +249,13 @@ return function(context, parent)
 			if ok and globals and type(globals.getclipboard) == "function" then return globals.getclipboard end
 		end
 	end
+	local function fileReader()
+		if type(readfile) == "function" then return readfile end
+		if type(getgenv) == "function" then
+			local ok, globals = pcall(getgenv)
+			if ok and globals and type(globals.readfile) == "function" then return globals.readfile end
+		end
+	end
 	local function bytes(size)
 		if size >= 1024 * 1024 then return string.format("%.1f MiB", size / (1024 * 1024)) end
 		if size >= 1024 then return string.format("%.1f KiB", size / 1024) end
@@ -242,13 +265,13 @@ return function(context, parent)
 		form.Visible, review.Visible, complete.Visible = stage == "import", stage == "review", stage == "added"
 		check.Visible, add.Visible, back.Visible = stage == "import", stage == "review", stage == "review"
 		another.Visible, done.Visible = stage == "added", stage == "added"
-		for _, item in ipairs({ check, add, back, paste, selectAll, another }) do
+		for _, item in ipairs({ check, add, back, paste, selectAll, another, pasteMode, fileMode }) do
 			item.Active, item.AutoButtonColor = not busy, false
 			item.TextTransparency = busy and 0.4 or 0
 		end
 		add.Active = not busy and stage == "review"
 		check.Text, add.Text = busy and "Checking..." or "Review shape", busy and "Adding..." or "Add & use"
-		name.TextEditable, luaSource.TextEditable = not busy, not busy
+		name.TextEditable, luaSource.TextEditable, filePath.TextEditable = not busy, not busy, not busy
 		importStep.TextColor3 = stage == "import" and colors.text or colors.muted
 		reviewStep.TextColor3 = stage ~= "import" and colors.success or colors.muted
 		importStep.BackgroundColor3 = stage == "import" and colors.accent or colors.raised
@@ -257,11 +280,20 @@ return function(context, parent)
 		paste.Visible, nativePaste.Visible = canPaste, not canPaste
 		selectAll.Position = canPaste and UDim2.new(0.62, 4, 0, 0) or UDim2.new(1, -100, 0, 0)
 		selectAll.Size = canPaste and UDim2.new(0.38, -4, 1, 0) or UDim2.new(0, 100, 1, 0)
+		local file = sourceMode == "file"
+		pasteActions.Visible, codeScroll.Visible, fileGroup.Visible = not file, not file, file
+		pasteMode.TextColor3, fileMode.TextColor3 = file and colors.muted or colors.focus, file and colors.focus or colors.muted
+		sourceLabel.Text = file and "SOURCE FILE" or "LUA SCRIPT"
+		help.Text = file and "Export Lua from Shape Studio, then enter its saved file path."
+			or "Export Lua from Shape Studio, then paste your script here."
+		fileHelp.Text = fileReader() and "Enter a Lua file path in your executor's workspace. Large exports load directly without pasting or restarting."
+			or "This executor cannot read local files. Choose Paste Lua to import your script."
 		local length = #luaSource.Text
-		sourceInfo.Text = length == 0 and "No script pasted yet" or (bytes(length) .. " pasted  /  Lua module")
+		sourceInfo.Text = file and "The complete file is read when you choose Review shape."
+			or (length == 0 and "No script pasted yet" or (bytes(length) .. " pasted  /  Lua module"))
 	end
 	local function releaseFocus()
-		for _, item in ipairs({ name, luaSource }) do if item:IsFocused() then item:ReleaseFocus() end end
+		for _, item in ipairs({ name, luaSource, filePath }) do if item:IsFocused() then item:ReleaseFocus() end end
 	end
 	local function layout()
 		if not alive() then return end
@@ -327,13 +359,15 @@ return function(context, parent)
 		if offset ~= 0 then body.CanvasPosition = Vector2.new(0, math.max(0, body.CanvasPosition.Y + offset)) end
 	end
 	connect(body:GetPropertyChangedSignal("AbsoluteSize"), function()
-		if luaSource:IsFocused() then showField(luaSource) elseif name:IsFocused() then showField(name) end
+		if luaSource:IsFocused() then showField(luaSource) elseif filePath:IsFocused() then showField(filePath)
+		elseif name:IsFocused() then showField(name) end
 	end)
 	local function edited()
 		if changing then return end
 		stage, reviewed = "import", nil
 		nameOutline.Color = name:IsFocused() and colors.focus or colors.line
 		sourceOutline.Color = luaSource:IsFocused() and colors.focus or colors.line
+		fileOutline.Color = filePath:IsFocused() and colors.focus or colors.line
 		setStatus(nil); refresh()
 	end
 	connect(name:GetPropertyChangedSignal("Text"), edited)
@@ -348,13 +382,24 @@ return function(context, parent)
 		end
 		edited()
 	end)
-	for _, item in ipairs({ name, luaSource }) do
-		local outline = item == name and nameOutline or sourceOutline
+	connect(filePath:GetPropertyChangedSignal("Text"), function()
+		if changing then return end
+		if name.Text:match("^%s*$") then
+			local suggested = filePath.Text:match("([^/\\]+)%.[Ll][Uu][Aa]%s*$")
+				or filePath.Text:match("([^/\\]+)%.[Tt][Xx][Tt]%s*$")
+			if suggested and #suggested <= 80 then changing = true; name.Text = suggested; changing = false end
+		end
+		edited()
+	end)
+	for _, item in ipairs({ name, luaSource, filePath }) do
+		local outline = item == name and nameOutline or (item == filePath and fileOutline or sourceOutline)
 		connect(item.Focused, function() tint(outline, { Color = colors.focus }); layout(); showField(item) end)
 		connect(item.FocusLost, function() tint(outline, { Color = colors.line }) end)
 	end
 	connect(name.FocusLost, function(enterPressed)
-		if enterPressed and overlay.Visible and stage == "import" and not busy then luaSource:CaptureFocus() end
+		if enterPressed and overlay.Visible and stage == "import" and not busy then
+			(sourceMode == "file" and filePath or luaSource):CaptureFocus()
+		end
 	end)
 	local function closeEditor()
 		if not alive() then return end
@@ -362,13 +407,19 @@ return function(context, parent)
 	end
 	local function run(adding)
 		if busy or not alive() or (adding and stage ~= "review") or (not adding and stage ~= "import") then return end
-		local requestedName, requestedSource = name.Text, luaSource.Text
-		if adding and (not reviewed or reviewed.name ~= requestedName or reviewed.source ~= requestedSource) then
+		local requestedName, requestedMode = name.Text, sourceMode
+		local requestedSource = requestedMode == "file" and filePath.Text or luaSource.Text
+		local function sameDraft()
+			return requestedName == name.Text and requestedMode == sourceMode
+				and requestedSource == (sourceMode == "file" and filePath.Text or luaSource.Text)
+		end
+		if adding and (not reviewed or reviewed.name ~= requestedName or reviewed.source ~= requestedSource or reviewed.mode ~= requestedMode) then
 			stage, reviewed = "import", nil
 			setStatus("Your draft changed. Review it again before adding."); refresh(); return
 		end
 		releaseFocus(); busy = true; refresh()
 		setStatus(adding and "Adding your shape..." or "Checking the module and its controls...")
+		local moduleSource = requestedSource
 		local ok, success, result = pcall(function()
 			local manager = context.custom_shapes
 			if not manager then
@@ -378,8 +429,22 @@ return function(context, parent)
 				manager = module.create(context); context.custom_shapes = manager
 			end
 			if not alive() then return false, "Session has ended." end
-			if adding then return manager.add(requestedName, requestedSource) end
-			return manager.validate(requestedName, requestedSource)
+			if adding then return manager.add(requestedName, reviewed.moduleSource, reviewed.entry) end
+			local sourcePath
+			if requestedMode == "file" then
+				sourcePath = requestedSource:match("^%s*(.-)%s*$")
+				if sourcePath == "" then return false, "Enter the path to your Lua shape file." end
+				local reader = fileReader()
+				if not reader then return false, "This executor cannot read local files. Choose Paste Lua instead." end
+				local read, content = pcall(reader, sourcePath)
+				if not alive() then return false, "Session has ended." end
+				if not sameDraft() then return false, "Your draft changed while reading. Review the current version again." end
+				if not read or type(content) ~= "string" then
+					return false, "Could not read that file. Check the path in your executor's workspace. " .. tostring(content)
+				end
+				moduleSource = content
+			end
+			return manager.validate(requestedName, moduleSource, sourcePath)
 		end)
 		busy = false
 		if not alive() then return end
@@ -387,9 +452,10 @@ return function(context, parent)
 			stage, reviewed = "import", nil
 			local message = tostring(ok and result or success)
 			setStatus(message, "error")
-			if message:lower():find("name", 1, true) then nameOutline.Color = colors.error else sourceOutline.Color = colors.error end
+			if message:lower():find("name", 1, true) then nameOutline.Color = colors.error
+			elseif sourceMode == "file" then fileOutline.Color = colors.error else sourceOutline.Color = colors.error end
 		elseif adding then
-			local draftChanged = requestedName ~= name.Text or requestedSource ~= luaSource.Text
+			local draftChanged = not sameDraft()
 			stage = draftChanged and "import" or "added"
 			reviewed = nil
 			local shapeName = result.name or requestedName
@@ -399,11 +465,12 @@ return function(context, parent)
 			local message = result.message or (result.persisted and "Saved for next launch." or "Available for this session only.")
 			if draftChanged then message = message .. " Your newer draft is still here." end
 			setStatus(message, "success")
-		elseif requestedName ~= name.Text or requestedSource ~= luaSource.Text then
+		elseif not sameDraft() then
 			stage, reviewed = "import", nil
 			setStatus("Your draft changed while checking. Review the current version again.")
 		else
-			stage, reviewed = "review", { name = requestedName, source = requestedSource }
+			stage, reviewed = "review", { name = requestedName, source = requestedSource, mode = requestedMode,
+				moduleSource = moduleSource, entry = result }
 			reviewTitle.Text = result.name
 			local controls = result.module and result.module.Controls or {}
 			reviewDetails.Text = bytes(#result.source) .. " Lua module  /  " .. tostring(#controls) .. " custom control" .. (#controls == 1 and "" or "s")
@@ -413,48 +480,54 @@ return function(context, parent)
 				names[#names + 1] = control.Name .. "  /  " .. tostring(control.Type)
 			end
 			reviewControls.Text = #names > 0 and (table.concat(names, "\n") .. (#controls > 8 and ("\n+ " .. (#controls - 8) .. " more") or "")) or "Uses Gravity's standard shape settings."
-			reviewStorage.Text = type(writefile) == "function"
-				and "Gravity will save this shape for your next launch if file access is available."
-				or "Available for this session. Your executor does not support saving files."
+			reviewStorage.Text = result.existing_path and ("Uses the existing file at " .. result.existing_path .. ". The file will not be rewritten.")
+				or (type(writefile) == "function" and "Gravity will save this shape for your next launch if file access is available."
+				or "Available for this session. Your executor does not support saving files.")
 			setStatus("Looks good. Ready to add.", "success")
 		end
 		refresh(); layout()
 	end
 	connect(check.Activated, function() run(false) end)
 	connect(add.Activated, function() run(true) end)
+	local function setSourceMode(mode)
+		if busy or stage ~= "import" or sourceMode == mode then return end
+		releaseFocus(); sourceMode = mode; edited(); layout()
+	end
+	connect(pasteMode.Activated, function() setSourceMode("paste") end)
+	connect(fileMode.Activated, function() setSourceMode("file") end)
 	connect(back.Activated, function()
 		if busy or stage ~= "review" then return end
 		stage = "import"; setStatus(nil); body.CanvasPosition = Vector2.new(0, 0); refresh()
 	end)
 	connect(another.Activated, function()
 		if busy or stage ~= "added" then return end
-		changing = true; name.Text, luaSource.Text = "", ""; changing = false
+		changing = true; name.Text, luaSource.Text, filePath.Text = "", "", ""; changing = false
 		codeScroll.CanvasPosition = Vector2.new(0, 0)
 		body.CanvasPosition = Vector2.new(0, 0)
 		edited(); layout()
 	end)
 	connect(paste.Activated, function()
-		if busy or stage ~= "import" then return end
+		if busy or stage ~= "import" or sourceMode ~= "paste" then return end
 		local reader = clipboardReader()
 		if not reader then return end
 		local previousName, previousSource = name.Text, luaSource.Text
 		local ok, value = pcall(reader)
 		if not alive() then return end
-		if stage ~= "import" or name.Text ~= previousName or luaSource.Text ~= previousSource then return end
+		if stage ~= "import" or sourceMode ~= "paste" or name.Text ~= previousName or luaSource.Text ~= previousSource then return end
 		if not ok or type(value) ~= "string" or value:match("^%s*$") then
 			setStatus("Clipboard is empty or unavailable. Copy your Lua export, or press and hold in the script field to paste.", "error"); return
 		end
 		local pasted = pcall(function() luaSource.Text = value end)
 		if not pasted or luaSource.Text ~= value then
 			changing = true; luaSource.Text, name.Text = previousSource, previousName; changing = false
-			setStatus("The script could not fit in this text field. Save the full export in GravityShapes as a .lua file, then restart Gravity.", "error")
+			setStatus("The script could not fit in this text field. Choose Local file and enter the path to your complete Lua export.", "error")
 			refresh(); return
 		end
 		codeScroll.CanvasPosition = Vector2.new(0, 0)
 		setStatus("Script pasted. Review it when you are ready.")
 	end)
 	connect(selectAll.Activated, function()
-		if busy or stage ~= "import" then return end
+		if busy or stage ~= "import" or sourceMode ~= "paste" then return end
 		luaSource:CaptureFocus()
 		luaSource.SelectionStart, luaSource.CursorPosition = 1, #luaSource.Text + 1
 	end)
@@ -467,7 +540,8 @@ return function(context, parent)
 			pcall(function()
 				connect(inputService:GetPropertyChangedSignal(property), function()
 					layout()
-					if luaSource:IsFocused() then showField(luaSource) elseif name:IsFocused() then showField(name) end
+					if luaSource:IsFocused() then showField(luaSource) elseif filePath:IsFocused() then showField(filePath)
+					elseif name:IsFocused() then showField(name) end
 				end)
 			end)
 		end

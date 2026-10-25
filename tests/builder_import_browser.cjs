@@ -77,6 +77,43 @@ const server = http.createServer((request, response) => {
     }
     await open('coordinates');
     assert.equal(await page.locator('#source-error').textContent(), '', 'coordinate preview succeeds');
+    const races = await page.evaluate(async () => {
+      const input = document.querySelector('#source-coordinates-file');
+      const source = document.querySelector('#source-coordinates');
+      const start = text => {
+        Object.defineProperty(input, 'files', { configurable: true, value: [{ size: 100, text }] });
+        return input.onchange({ target: input });
+      };
+      try {
+        let finishOld;
+        const old = start(() => new Promise(resolve => { finishOld = resolve; }));
+        const pendingDisabled = document.querySelector('#source-apply').disabled;
+        await start(async () => '1,2,3\n4,5,6');
+        finishOld('7,8,9\n10,11,12'); await old;
+        const latest = source.value;
+
+        let finishEdited;
+        const edited = start(() => new Promise(resolve => { finishEdited = resolve; }));
+        source.value = '20,0,0\n30,0,0'; source.dispatchEvent(new Event('input'));
+        finishEdited('40,0,0\n50,0,0'); await edited;
+        const manual = source.value, enabledAfterEdit = !document.querySelector('#source-apply').disabled;
+
+        let finishSwitched;
+        const switched = start(() => new Promise(resolve => { finishSwitched = resolve; }));
+        const mode = document.querySelector('#source-mode');
+        mode.value = 'formula'; mode.dispatchEvent(new Event('change'));
+        finishSwitched('60,0,0\n70,0,0'); await switched;
+        const afterSwitch = source.value, summary = document.querySelector('#source-summary').textContent;
+        mode.value = 'coordinates'; mode.dispatchEvent(new Event('change'));
+        return { pendingDisabled, latest, manual, enabledAfterEdit, afterSwitch, summary };
+      } finally { delete input.files; }
+    });
+    assert.equal(races.pendingDisabled, true, 'pending reads cannot accidentally add old geometry');
+    assert.equal(races.latest, '1,2,3\n4,5,6', 'the newest coordinate file wins');
+    assert.equal(races.manual, '20,0,0\n30,0,0', 'typing cancels a pending file replacement');
+    assert.equal(races.enabledAfterEdit, true);
+    assert.equal(races.afterSwitch, races.manual, 'switching source mode cancels the old read');
+    assert.match(races.summary, /Preview your geometry/, 'old file completion does not preview a different source mode');
     await page.locator('#source-coordinates-type').selectOption('pointcloud');
     await page.locator('#source-coordinates').fill('[[1,2,3],[7,8,9],[4,5,6]]');
     await page.locator('#source-apply').click();
@@ -110,6 +147,18 @@ const server = http.createServer((request, response) => {
     await page.locator('#source-apply').click();
     await page.locator('#source-editor').waitFor({ state: 'detached' });
     assert.equal((await page.evaluate(() => window.applied[0].path.points)).length, 3);
+
+    await open('coordinates');
+    await page.evaluate(async () => {
+      const dialog = document.querySelector('#source-editor'), input = document.querySelector('#source-coordinates-file');
+      let rejectRead;
+      Object.defineProperty(input, 'files', { value: [{ size: 100, text: () => new Promise((_, reject) => { rejectRead = reject; }) }] });
+      const pending = input.onchange({ target: input });
+      dialog.close();
+      await new Promise(resolve => requestAnimationFrame(resolve));
+      rejectRead(new Error('A closed dialog read failed')); await pending;
+    });
+    await page.locator('#source-editor').waitFor({ state: 'detached' });
 
     // Exercise the real app callbacks: one import is one undo, and geometry
     // survives both JSON files and browser restore before exporting to Lua.

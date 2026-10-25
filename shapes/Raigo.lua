@@ -315,7 +315,7 @@ M.Controls = {
 	{ Type = "Slider", Name = "Orb Radius", Min = 2, Max = 40, Key = "k11", Default = 8 },
 	{ Type = "Slider", Name = "Flight Speed", Min = 40, Max = 1200, Key = "k12", Default = 250 },
 	{ Type = "Slider", Name = "Blast Radius", Min = 15, Max = 400, Key = "k13", Default = 80 },
-	{ Type = "Slider", Name = "Blast Duration", Min = 2, Max = 30, Key = "k14", Default = 7, Div = 10 },
+	{ Type = "Slider", Name = "Blast Duration", Min = 2, Max = 30, Key = "k14", Default = 0.7, Div = 10 },
 	{ Type = "Slider", Name = "Hover Height", Min = 3, Max = 50, Key = "k15", Default = 12 },
 	{
 		Type = "Slider",

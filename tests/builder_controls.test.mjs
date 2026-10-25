@@ -1,8 +1,7 @@
 import assert from 'node:assert/strict';
-import { mkdtempSync, writeFileSync, rmSync } from 'node:fs';
+import { mkdtempSync, readFileSync, writeFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { fileURLToPath } from 'node:url';
 import { spawnSync } from 'node:child_process';
 import { createLayer, normalizeProject, sampleProject, applyPreviewAction } from '../docs/plugins/builder/model.mjs';
 import { exportLua, luaString } from '../docs/plugins/builder/exporter.mjs';
@@ -112,7 +111,7 @@ if (executable) {
   set('speed', -2); check(9); action('reverse', 9); check(9); check(10);
   action('reset', 10); check(10); action('reverse', 10); action('reverse', 10); check(12);
   const code = `
-local dispatch = dofile(${luaString(fileURLToPath(new URL('../PluginControls.lua', import.meta.url)))})
+local dispatch = assert((loadstring or load)(${luaString(readFileSync(new URL('../PluginControls.lua', import.meta.url), 'utf8'))}))()
 Vector3 = {}; local mt = {}; mt.__index = mt
 function Vector3.new(x,y,z) return setmetatable({X=x,Y=y,Z=z}, mt) end
 mt.__add = function(a,b) return Vector3.new(a.X+b.X,a.Y+b.Y,a.Z+b.Z) end

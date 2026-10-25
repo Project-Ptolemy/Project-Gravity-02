@@ -158,6 +158,17 @@ the editor reports that it is available for this session only. You can also
 download a `.lua` plugin, put it in `GravityShapes`, and restart Project Gravity
 to select it by filename.
 
+To add a downloaded file immediately, choose **Local file** in the in-game editor
+and enter its path in your executor's workspace, then **Review shape** and
+**Add & use**. This avoids the text box's size limits. Review runs initialization
+once and Add reuses that module. A new matching file in `GravityShapes` is
+registered without rewriting it.
+
+If you edit the scene while a project file is loading, the builder keeps those
+edits and asks you to select the file again. Selecting another file supersedes
+the earlier read. Closing an SVG/coordinate import or editing its source also
+cancels pending file results.
+
 Projects support up to 64 layers, 4,096 vertices per path and 8,192 preview parts.
 New scenes start with **128 debris parts**. Existing projects retain their saved
 count. Adjust **Preview settings → Debris count** to see your formation at other

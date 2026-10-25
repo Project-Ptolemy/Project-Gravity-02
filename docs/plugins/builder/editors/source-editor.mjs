@@ -44,9 +44,15 @@ export function openSourceEditor({ mode = 'svg', onApply, remainingLayers = 64 }
   $('source-mode').value = mode;
   const viewport = new Viewport($('source-preview'));
   viewport.setOptions({ move: false, core: false, pointSize: 1.2 });
-  let frame;
+  let frame, readVersion = 0;
+  function cancelRead() {
+    readVersion++;
+    $('source-apply').disabled = false; $('source-preview-button').disabled = false;
+    for (const kind of ['svg', 'coordinates']) $('source-' + kind + '-file').value = '';
+  }
   function animate() { viewport.render(); frame = requestAnimationFrame(animate); }
   function selectMode() {
+    cancelRead();
     mode = $('source-mode').value;
     dialog.querySelectorAll('[data-source-panel]').forEach(panel => { panel.hidden = panel.dataset.sourcePanel !== mode; });
     $('source-error').textContent = ''; $('source-summary').textContent = 'Preview your geometry before adding it.';
@@ -84,14 +90,22 @@ export function openSourceEditor({ mode = 'svg', onApply, remainingLayers = 64 }
     if (surface && Number($('source-formula-samples').value) * Number($('source-formula-rows').value) > 4096) $('source-formula-samples').value = 64;
   };
   for (const kind of ['svg', 'coordinates']) {
+    $('source-' + kind).addEventListener('input', cancelRead);
     $('source-' + kind + '-file').onchange = async event => {
       const file = event.target.files[0]; if (!file) return;
+      const input = event.target, request = ++readVersion;
+      const current = () => dialog.isConnected && dialog.open && request === readVersion;
+      $('source-apply').disabled = true; $('source-preview-button').disabled = true;
+      $('source-error').textContent = '';
       try {
         if (file.size > 2_000_000) throw new Error('Choose a file smaller than 2 MB.');
-        const source = await file.text(); if (!dialog.isConnected) return;
+        const source = await file.text(); if (!current()) return;
         $('source-' + kind).value = source; preview();
-      } catch (error) { $('source-error').textContent = error.message; }
-      event.target.value = '';
+      } catch (error) {
+        if (current()) $('source-error').textContent = error.message;
+      } finally {
+        if (current()) { input.value = ''; cancelRead(); }
+      }
     };
   }
   dialog.querySelectorAll('[data-dismiss]').forEach(button => { button.onclick = () => dialog.close(); });
