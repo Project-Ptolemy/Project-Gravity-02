@@ -111,6 +111,7 @@ local function newInstance(class, parent)
   props.Text=""; props.Visible=true; props.Transparency=0; props.BackgroundTransparency=0
   props.CFrame=CFrame.new(0,0,0); props.Velocity=Vector3.zero
   props.AssemblyLinearVelocity=Vector3.zero; props.AssemblyAngularVelocity=Vector3.zero
+  props.AssemblyRootPart=self; props.ReceiveAge=0
   props.Anchored=false; props.CanCollide=true; props.Massless=false
   props.CustomPhysicalProperties=nil
   methods.Destroy=function() props.Parent=nil end
@@ -128,6 +129,7 @@ local function newInstance(class, parent)
   methods.AddTag=function() end
   methods.HasTag=function() return false end
   methods.GetTags=function() return {} end
+  methods.GetJoints=function() return {} end
   methods.ResetOrientation=function() end
   methods.Activate=function() end
   methods.CaptureFocus=function() end

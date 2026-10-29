@@ -836,7 +836,7 @@ return function(context)
 			et(ac, "Predictive Tracking", x1.PredictiveTracking ~= false, function(v)
 				x1.PredictiveTracking = v
 				save_settings()
-			end, "Predicts player movement to smooth out parts when targeting them.")
+			end, "Predicts horizontal movement while keeping the core at the player's actual height.")
 
 			es(ac, "Prediction Factor", 0, 500, x1.PredictionFactor or 150, function(v)
 				x1.PredictionFactor = v

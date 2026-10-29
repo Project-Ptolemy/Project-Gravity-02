@@ -1,5 +1,12 @@
 # Changelog
 
+## October 29, 2026 - Vehicle physics and jump tracking
+
+- Leave joined vehicle parts, hinged mechanisms and existing movers out of independent part control; retry detached debris without requiring a map refresh.
+- Disable stale actuators during ownership handoffs and invalid physics updates, preserve later anchoring changes, and keep invalid character poses out of shared shape state on desktop and mobile.
+- Predict horizontal movement while following the character's actual height, and update the core before calculating held-part motion to prevent jump dips and a frame of tracking lag.
+- Add desktop/mobile regression coverage for connected parts, ownership recovery, invalid physics and jump trajectories.
+
 ## October 25, 2026 - Custom imports and physics reliability
 
 - Completely remove the legacy `ai/` implementation, `ai_chat.lua`, its obsolete tests and tooling references.

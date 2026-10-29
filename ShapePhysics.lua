@@ -24,6 +24,39 @@ function M.clamp_velocity(value, limit)
 	return value
 end
 
+function M.valid_motion(part)
+	return M.finite_vector(part.Position) and M.finite_vector(part.AssemblyLinearVelocity)
+		and M.finite_vector(part.AssemblyAngularVelocity)
+end
+
+-- Shapes assign independent destinations. Applying those forces to welded
+-- vehicle panels or hinged wheels makes them fight their existing mechanism.
+-- GetJoints includes active constraints even when parented somewhere else.
+function M.can_drive(part, linear, angular)
+	local root = part.AssemblyRootPart
+	if part.Anchored or (root and root ~= part) then return false end
+	for _, joint in ipairs(part:GetJoints()) do
+		if joint ~= linear and joint ~= angular then return false end
+	end
+	for _, child in ipairs(part:GetChildren()) do
+		if child:IsA("BodyMover") then return false end
+	end
+	return true
+end
+
+-- Keep the core at the character's real height. Extrapolating downward
+-- velocity put it below the floor during a jump, then snapped it back on
+-- landing. The horizontal lead still compensates for movement and latency.
+function M.predict_position(root, factor)
+	local pos = root.Position
+	if not M.finite_vector(pos) then return nil end
+	local vel = root.AssemblyLinearVelocity
+	if not M.finite_vector(vel) then return pos end
+	if type(factor) ~= "number" or factor ~= factor or math.abs(factor) == math.huge then factor = 150 end
+	local lead = M.clamp_velocity(Vector3.new(vel.X, 0, vel.Z), 250)
+	return pos + lead * (math.clamp(factor, 0, 500) / 1000)
+end
+
 -- A callback can fail only for a particular part or return invalid arithmetic.
 -- Guard every invocation so one imported module cannot abort the whole sweep.
 function M.evaluate(callback, part, center, data, clock, config, settings, state, constants)
@@ -69,8 +102,28 @@ function M.park(d)
 	if d.av then d.av.AngularVelocity = Vector3.zero end
 end
 
+-- A zero velocity at unlimited force is still an active brake. Ownership
+-- handoffs and invalid world state must disable actuators, then discard their
+-- old feedback before they can be rearmed.
+function M.suspend(d)
+	M.park(d)
+	if d.lv then d.lv.Enabled = false end
+	if d.av then d.av.Enabled = false end
+	d.suspended = true
+end
+
+function M.resume(d, x1)
+	if not d.suspended then return end
+	d.suspended = nil
+	M.park(d)
+	local drive = not x1.Disabled and not d.free_active
+	if d.lv then d.lv.Enabled = drive; d.lv.MaxForce = drive and x1.k4 or 0 end
+	if d.av then d.av.Enabled = drive; d.av.MaxTorque = drive and math.huge or 0 end
+end
+
 function M.apply(p, d, x1)
 	local free = d.free_physics == true
+	if d.suspended then return free end
 	local resumed = false
 	if free and not d.free_active then
 		d.free_active = true
