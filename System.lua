@@ -1381,12 +1381,13 @@ return function(context)
 			deferred_claims[p] = true
 			return false
 		end
+		-- Register loose debris while ownership is pending so the normal density
+		-- and collision setup can run. Only its actuators wait for the handoff;
+		-- the held-part loop can then resume it without waiting for a scan retry.
+		local awaiting_ownership = false
 		if not x1.AggressiveClaim and type(isnetworkowner) == "function" then
 			local ok, owned = pcall(isnetworkowner, p)
-			if ok and owned == false then
-				deferred_claims[p] = true
-				return false
-			end
+			awaiting_ownership = ok and owned == false
 		end
 		deferred_claims[p] = nil
 		if old_attachment then old_attachment:Destroy() end
@@ -1412,6 +1413,7 @@ return function(context)
 		
 		local lv = Instance.new("LinearVelocity")
 		lv.Name = "GRV_LV"
+		lv.Enabled = not awaiting_ownership
 		lv.MaxForce = x1.Disabled and 0 or x1.k4
 		lv.VelocityConstraintMode = Enum.VelocityConstraintMode.Vector
 		lv.RelativeTo = Enum.ActuatorRelativeTo.World
@@ -1419,6 +1421,7 @@ return function(context)
 
 		local av = Instance.new("AngularVelocity")
 		av.Name = "GRV_AV"
+		av.Enabled = not awaiting_ownership
 		av.MaxTorque = x1.Disabled and 0 or math.huge
 		av.RelativeTo = Enum.ActuatorRelativeTo.World
 		av.AngularVelocity = Vector3.zero
@@ -1433,6 +1436,7 @@ return function(context)
 			at = a,
 			lv = lv,
 			av = av,
+			suspended = awaiting_ownership or nil,
 			integral = Vector3.zero,
 			claim_t = time(),
 			id = x6.part_id_counter,

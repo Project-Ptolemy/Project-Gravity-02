@@ -1,5 +1,10 @@
 # Changelog
 
+## October 30, 2026 - Part ownership acquisition
+
+- Prepare eligible loose debris while network ownership is pending instead of waiting for the workspace scan to drain before retrying. Keep its actuators disabled until ownership arrives, then resume through the normal update loop on desktop and mobile.
+- Add regression coverage for ownership arrival during a busy scan, acquisition setup, property restoration and ownership API fallbacks.
+
 ## October 29, 2026 - Vehicle physics and jump tracking
 
 - Leave joined vehicle parts, hinged mechanisms and existing movers out of independent part control; retry detached debris without requiring a map refresh.

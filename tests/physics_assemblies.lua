@@ -89,9 +89,49 @@ for _, mobile in ipairs({ false, true }) do
 	check(not context.x4.f1(motor_part), label .. "legacy vehicle movers do not receive competing controls")
 	local remote = part("RemoteDebris")
 	ownership[remote] = false
-	local remote_properties = remote.CustomPhysicalProperties
-	check(not context.x4.f1(remote) and untouched(remote, remote_properties),
-		label .. "a known remote owner prevents claim-time forces and property changes")
+	remote.CustomPhysicalProperties = properties
+	check(context.x4.f1(remote), label .. "loose debris registers before network ownership arrives")
+	local remote_data = assert(x6.a[remote])
+	check(remote:FindFirstChild("GRV_ATT") == remote_data.at and not remote.CanCollide
+		and remote.CustomPhysicalProperties ~= properties,
+		label .. "pending ownership retains the normal attachment, collision and mass preparation")
+	check(remote_data.lv.Enabled == false and remote_data.av.Enabled == false,
+		label .. "pending ownership cannot apply claim-time forces")
+	tick()
+	check(visits[remote] == nil and remote_data.lv.Enabled == false and remote_data.av.Enabled == false,
+		label .. "pending ownership does not invoke the shape or rearm actuators")
+	-- Leave enough workspace traversal queued to exceed one frame's processing
+	-- budget. Ownership recovery must use the held record, without waiting for
+	-- that unrelated scan to drain and the deferred-candidate retry timer to fire.
+	local backlog = Instance.new("Folder", workspace)
+	rawset(backlog, "IsDescendantOf", function(_, parent) return parent == workspace end)
+	for _ = 1, 300 do x6.claim_queue[#x6.claim_queue + 1] = backlog end
+	ownership[remote] = true
+	tick()
+	check(#x6.claim_queue > 0 and visits[remote] == 1 and remote_data.lv.Enabled and remote_data.av.Enabled
+		and near(remote_data.lv.VectorVelocity, Vector3.new(60, 0, 0)),
+		label .. "ownership arrival drives debris on the next heartbeat while the workspace scan is still queued")
+	table.clear(x6.claim_queue)
+	backlog:Destroy()
+	context.x4.f2(remote, false)
+	check(untouched(remote, properties), label .. "releasing prepared debris restores original properties")
+	local pending_release = part("PendingOwnershipRelease")
+	ownership[pending_release], pending_release.CustomPhysicalProperties = false, properties
+	check(context.x4.f1(pending_release) and x6.a[pending_release].suspended,
+		label .. "pending-release debris registers with suspended forces")
+	context.x4.f2(pending_release, false)
+	check(ownership[pending_release] == false and untouched(pending_release, properties)
+		and pending_release:FindFirstChild("GRV_ATT") == nil,
+		label .. "releasing debris before ownership arrives restores original properties and removes all constraints")
+	local aggressive = part("AggressiveDebris")
+	ownership[aggressive], x1.AggressiveClaim = false, true
+	check(context.x4.f1(aggressive) and not x6.a[aggressive].suspended,
+		label .. "Aggressive Claim registers remote debris without ownership suspension")
+	tick()
+	check(visits[aggressive] == 1 and x6.a[aggressive].lv.VectorVelocity.X > 0,
+		label .. "Aggressive Claim continues to bypass the ownership drive gate")
+	context.x4.f2(aggressive, false)
+	x1.AggressiveClaim = false
 
 	local loose = part("LooseVehicleDebris")
 	check(context.x4.f1(loose), label .. "ordinary loose debris remains claimable")
@@ -137,15 +177,25 @@ for _, mobile in ipairs({ false, true }) do
 	local previous_hidden, legacy_owner = gethiddenproperty, 2
 	isnetworkowner = function() error("ownership API unavailable") end
 	gethiddenproperty = function(object, name)
-		if object == loose and name == "NetworkOwnerV3" then return legacy_owner end
+		if name == "NetworkOwnerV3" then return legacy_owner end
 		return previous_hidden(object, name)
 	end
+	local legacy_error = part("LegacyOwnershipError")
+	check(context.x4.f1(legacy_error), label .. "an unavailable ownership API cannot reject otherwise eligible debris")
+	isnetworkowner = nil
+	local legacy_missing = part("LegacyOwnershipMissing")
+	check(context.x4.f1(legacy_missing), label .. "a missing ownership API cannot reject otherwise eligible debris")
 	d.no3_val, d.no3_tick = nil, nil
 	tick()
 	check(not d.lv.Enabled and not d.av.Enabled, label .. "legacy ownership fallback also disables stale commands")
+	check(visits[legacy_error] == nil and visits[legacy_missing] == nil
+		and x6.a[legacy_error].lv.Enabled == false and x6.a[legacy_missing].lv.Enabled == false,
+		label .. "legacy ownership fallback prevents commands for newly registered remote debris")
 	legacy_owner = 0
 	tick(0.2)
 	check(d.lv.Enabled and d.lv.VectorVelocity.X > 0, label .. "legacy ownership fallback recovers after a handoff")
+	check(visits[legacy_error] == 1 and visits[legacy_missing] == 1,
+		label .. "legacy ownership handoff recovers newly registered debris")
 	gethiddenproperty = previous_hidden
 	isnetworkowner = function(part) return ownership[part] ~= false end
 
