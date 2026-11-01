@@ -1,29 +1,5 @@
 # Changelog
 
-## November 1, 2026 - Unanchored map part discovery
-
-- Watch eligible anchored map parts for `Anchored` changes and queue them as soon as they become loose, including parts added after the initial scan, on desktop and mobile.
-- Preserve scan candidates while the part-count limit is full. Disconnect anchor listeners when parts leave Workspace, are claimed, or the session is released, reset or unloaded.
-- Add a regression for picking up map parts after they unanchor without pressing Q, with busy scans, intact joints, part limits, pooled parts and lifecycle cleanup.
-
-## November 1, 2026 - Debris collection recovery
-
-- Retry detached debris during busy workspace scans with a bounded FIFO budget, without rescanning its children. Keep deferred candidates eligible while the part-count limit is full and clear retries on release/reset.
-- Check live joint endpoints and active force actuators instead of rejecting every joint entry. Handle disabled, broken and self-connected remnants while preserving intact vehicles and mechanisms on desktop and mobile.
-- Cover attachment ancestry, foreign actuators, collection during scan backlogs, part-count limits and deferred cleanup in the physics regressions.
-
-## October 30, 2026 - Part ownership acquisition
-
-- Prepare eligible loose debris while network ownership is pending instead of waiting for the workspace scan to drain before retrying. Keep its actuators disabled until ownership arrives, then resume through the normal update loop on desktop and mobile.
-- Add regression coverage for ownership arrival during a busy scan, acquisition setup, property restoration and ownership API fallbacks.
-
-## October 29, 2026 - Vehicle physics and jump tracking
-
-- Leave joined vehicle parts, hinged mechanisms and existing movers out of independent part control; retry detached debris without requiring a map refresh.
-- Disable stale actuators during ownership handoffs and invalid physics updates, preserve later anchoring changes, and keep invalid character poses out of shared shape state on desktop and mobile.
-- Predict horizontal movement while following the character's actual height, and update the core before calculating held-part motion to prevent jump dips and a frame of tracking lag.
-- Add desktop/mobile regression coverage for connected parts, ownership recovery, invalid physics and jump trajectories.
-
 ## October 25, 2026 - Custom imports and physics reliability
 
 - Completely remove the legacy `ai/` implementation, `ai_chat.lua`, its obsolete tests and tooling references.

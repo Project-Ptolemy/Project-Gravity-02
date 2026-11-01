@@ -17,47 +17,6 @@ return function(context)
 		for p, d in pairs(x6.a) do ShapePhysics.apply_collisions(p, d, x1) end
 	end
 	local x7 = {}
-	-- Deduplicate candidates without keeping discarded parts alive. FIFO links
-	-- live in the records so retrying never needs a full-population sweep.
-	local deferred_claims = setmetatable({}, { __mode = "k" })
-	local deferred_queue = setmetatable({}, { __mode = "v" })
-	local anchored_claims = setmetatable({}, { __mode = "k" })
-	local deferred_head, deferred_tail
-	local function unwatch_anchored(part)
-		local connection = anchored_claims[part]
-		if not connection then return end
-		anchored_claims[part] = nil
-		connection:Disconnect()
-	end
-	local function watch_anchored(part)
-		if anchored_claims[part] then return end
-		-- Anchored changes do not fire DescendantAdded. Wait for the property
-		-- instead of filling the retry FIFO with the map's stationary parts.
-		local connection
-		connection = part:GetPropertyChangedSignal("Anchored"):Connect(function()
-			if anchored_claims[part] ~= connection or part.Anchored then return end
-			unwatch_anchored(part)
-			if not x6.torn_down and x6.o and part:IsDescendantOf(v4) then
-				x6.claim_queue[#x6.claim_queue + 1] = part
-			end
-		end)
-		anchored_claims[part] = connection
-	end
-	local function defer_claim(part)
-		if deferred_claims[part] then return end
-		local record = { ready = time() + 0.5 }
-		deferred_claims[part] = record
-		deferred_queue[record] = part
-		if deferred_tail then deferred_tail.next = record else deferred_head = record end
-		deferred_tail = record
-	end
-	local function clear_pending_claims()
-		for part in pairs(anchored_claims) do unwatch_anchored(part) end
-		table.clear(deferred_claims)
-		table.clear(deferred_queue)
-		deferred_head, deferred_tail = nil, nil
-	end
-	x4.clear_pending_claims = clear_pending_claims
 	local ANTI_SLEEP = Vector3.new(0, 0.01, 0)
 	local ZERO_VECTOR = Vector3.zero
 	local LIGHT_PHYSICS = PhysicalProperties.new(0.001, 0, 0, 0, 0)
@@ -347,11 +306,11 @@ return function(context)
 	end
 	x7.rule_reject = rule_reject
 
-	function x7.e(p, ignore_anchored)
+	function x7.e(p)
 		if not p:IsA("BasePart") then
 			return true
 		end
-		if p == x6.b or (p.Anchored and not ignore_anchored) then
+		if p.Anchored then
 			return true
 		end
 		if EXCLUDED_NAMES[p.Name] then
@@ -406,7 +365,20 @@ return function(context)
 		return char:FindFirstChild("HumanoidRootPart") or char:FindFirstChildWhichIsA("BasePart")
 	end
 
-	local get_predicted_pos = ShapePhysics.predict_position
+	local function get_predicted_pos(root, factor)
+		local pos = root.Position
+		local vel = root.AssemblyLinearVelocity
+		-- squared compare first: Magnitude's sqrt is only worth paying when the
+		-- velocity actually needs clamping. .Unit would then sqrt the same number
+		-- a second time, so scale by the root we already have instead.
+		local vel_sq = vel:Dot(vel)
+		if vel_sq > 62500 then
+			vel = vel * (250 / math.sqrt(vel_sq))
+		end
+		local y_vel = math.clamp(vel.Y, -50, 15)
+		vel = Vector3.new(vel.X, y_vel, vel.Z)
+		return pos + (vel * (factor / 1000))
+	end
 
 	local no_damp = { ["Slingshot"] = true, ["Point Impact"] = true, ["Light Light no Mi"] = true }
 
@@ -674,12 +646,12 @@ return function(context)
 					local root = tgt and root_of(tgt.Character)
 					if root then
 						local pos = root.Position
-						if ShapePhysics.finite_vector(pos) and (void_off or pos.Y > fallen_height) then
-							if predictive then pos = get_predicted_pos(root, pfactor) end
-							if pos then
-								valid_targets = valid_targets + 1
-								target_positions[valid_targets] = pos
+						if void_off or (pos.Y > fallen_height) then
+							if predictive then
+								pos = get_predicted_pos(root, pfactor)
 							end
+							valid_targets = valid_targets + 1
+							target_positions[valid_targets] = pos
 						end
 					end
 				end
@@ -780,7 +752,6 @@ return function(context)
 			end
 			local water_level = x6.water_level ~= false and x6.water_level or nil
 			local ghp = gethiddenproperty
-			local owner_check = isnetworkowner
 			local workspace_gravity = v4.Gravity or 196.2
 			local shape_f2 = cur_shape_mod and cur_shape_mod.f2
 			local shape_frame_tracking = cur_shape_mod and cur_shape_mod.FrameTracking and not blend_f2
@@ -868,36 +839,16 @@ return function(context)
 				if d.pc_mode == nil and i % et ~= update_bucket and not frame_tracking then
 					continue
 				end
-				if not ShapePhysics.can_drive(p, d.lv, d.av) then
-					-- A weld/seat/hinge can be added after the original claim.
-					-- Restore this part without changing its assembly's velocity.
-					defer_claim(p)
-					d.original_anchored = p.Anchored
-					x4.f2(p, false, k)
-					continue
-				end
-				if not ShapePhysics.valid_motion(p) then
-					ShapePhysics.suspend(d)
-					continue
-				end
-				local owned
-				if not aggressive_claim and type(owner_check) == "function" then
-					local ok, value = pcall(owner_check, p)
-					if ok and type(value) == "boolean" then owned = value end
-				end
-				if owned == nil and check_no3 then
+				if check_no3 then
 					if d.no3_val == nil or ft - (d.no3_tick or 0) > no3_interval then
 						d.no3_tick = ft
 						local success, no3_val = pcall(ghp, p, 'NetworkOwnerV3')
 						d.no3_val = success and no3_val or 0
 					end
-					owned = not NO3_SKIP[d.no3_val]
+					if NO3_SKIP[d.no3_val] then
+						continue
+					end
 				end
-				if owned == false then
-					ShapePhysics.suspend(d)
-					continue
-				end
-				ShapePhysics.resume(d, x1)
 				local active_c = c
 				if valid_targets > 0 then
 					active_c = target_positions[(d.id % valid_targets) + 1]
@@ -1245,14 +1196,6 @@ return function(context)
 		if x6.torn_down or not x6.b or x1.Disabled then
 			return
 		end
-		-- Prepasses can read the local character directly. A transient invalid
-		-- pose must not become persistent NaN state shared by every held part.
-		local character_root = root_of(v8.Character)
-		if not ShapePhysics.finite_vector(x6.b.Position)
-			or (character_root and not ShapePhysics.valid_motion(character_root)) then
-			for _, d in pairs(x6.a) do ShapePhysics.suspend(d) end
-			return
-		end
 		if x1.Paused then
 			-- ANTI_SLEEP is a constant, so the old code wrote the same value to
 			-- every constraint 60 times a second: 300k physics property writes a
@@ -1320,6 +1263,10 @@ return function(context)
 		-- all of them. This runs every frame during the initial workspace sweep,
 		-- when the queue is thousands of entries deep, so it is the difference
 		-- between a smooth start and a stutter.
+		local n = #queue
+		if n == 0 then
+			return
+		end
 		-- The budget is the claim throttle, and a throttle is the trade Max Fidelity
 		-- refuses: it spends a smooth start to have every part in hand sooner. The
 		-- three ceilings stay finite so a queue of a hundred thousand descendants
@@ -1337,29 +1284,6 @@ return function(context)
 		-- rest of the session -- including every part inside them if the ceiling is later
 		-- raised. Descendants keep being enumerated either way.
 		local cap = x1.TargetParts or 0
-		-- Joint changes need no DescendantAdded event. Reserve a bounded slice of
-		-- the existing budget for FIFO retries, even while traversal stays busy.
-		-- A retry visits only the part; its children were already enumerated.
-		local now = time()
-		local retry_processed = max_fid and 400 or 20
-		local retry_claimed = max_fid and 40 or 2
-		while deferred_head and (cap <= 0 or x6.n < cap) do
-			if processed >= retry_processed or claimed >= retry_claimed or os.clock() - start > cap_seconds * 0.25 then break end
-			local record = deferred_head
-			local part = deferred_queue[record]
-			local pending = part and deferred_claims[part] == record
-			if pending and record.ready > now then break end
-			deferred_queue[record] = nil
-			deferred_head = record.next
-			if not deferred_head then deferred_tail = nil end
-			record.next = nil
-			processed = processed + 1
-			if pending then
-				deferred_claims[part] = nil
-				if part:IsDescendantOf(v4) and x4.f1(part) then claimed = claimed + 1 end
-			end
-		end
-		local n = #queue
 		while n > 0 do
 			if processed >= cap_processed or claimed >= cap_claimed or os.clock() - start > cap_seconds then
 				break
@@ -1373,8 +1297,8 @@ return function(context)
 					n = n + 1
 					queue[n] = child
 				end
-				if instance:IsA("BasePart") then
-					if x4.f1(instance, cap) then
+				if instance:IsA("BasePart") and (cap <= 0 or x6.n < cap) then
+					if x4.f1(instance) then
 						claimed = claimed + 1
 					end
 				end
@@ -1406,7 +1330,6 @@ return function(context)
 			if x1.PredictiveTracking then
 				pos = get_predicted_pos(track, x1.PredictionFactor or 150)
 			end
-			if not ShapePhysics.finite_vector(pos) then return end
 			x6.b.Position = pos
 			x6.b.AssemblyLinearVelocity = ZERO_VECTOR
 			return
@@ -1426,38 +1349,14 @@ return function(context)
 		end
 	end
 
-	function x4.f1(p, claim_cap)
+	function x4.f1(p)
 		if x6.torn_down then return false end
-		if not p:IsA("BasePart") or x6.a[p] or x7.e(p, true) then
-			return false
-		end
-		if p.Anchored then
-			watch_anchored(p)
-			return false
-		end
-		unwatch_anchored(p)
-		-- Scan candidates must survive a full limit, including parts that just
-		-- unanchored. Explicit Part Control claims retain their existing behavior.
-		if claim_cap and claim_cap > 0 and x6.n >= claim_cap then
-			defer_claim(p)
+		if not p:IsA("BasePart") or x7.e(p) or x6.a[p] then
 			return false
 		end
 		local old_attachment = p:FindFirstChild("GRV_ATT")
 		local old_linear_velocity = p:FindFirstChild("GRV_LV")
 		local old_angular_velocity = p:FindFirstChild("GRV_AV")
-		if not ShapePhysics.valid_motion(p) or not ShapePhysics.can_drive(p, old_linear_velocity, old_angular_velocity) then
-			defer_claim(p)
-			return false
-		end
-		-- Register loose debris while ownership is pending so the normal density
-		-- and collision setup can run. Only its actuators wait for the handoff;
-		-- the held-part loop can then resume it without waiting for a scan retry.
-		local awaiting_ownership = false
-		if not x1.AggressiveClaim and type(isnetworkowner) == "function" then
-			local ok, owned = pcall(isnetworkowner, p)
-			awaiting_ownership = ok and owned == false
-		end
-		deferred_claims[p] = nil
 		if old_attachment then old_attachment:Destroy() end
 		if old_linear_velocity then old_linear_velocity:Destroy() end
 		if old_angular_velocity then old_angular_velocity:Destroy() end
@@ -1482,7 +1381,6 @@ return function(context)
 
 		local lv = Instance.new("LinearVelocity")
 		lv.Name = "GRV_LV"
-		lv.Enabled = not awaiting_ownership
 		lv.MaxForce = x1.Disabled and 0 or x1.k4
 		lv.VelocityConstraintMode = Enum.VelocityConstraintMode.Vector
 		lv.RelativeTo = Enum.ActuatorRelativeTo.World
@@ -1490,7 +1388,6 @@ return function(context)
 
 		local av = Instance.new("AngularVelocity")
 		av.Name = "GRV_AV"
-		av.Enabled = not awaiting_ownership
 		av.MaxTorque = x1.Disabled and 0 or math.huge
 		av.RelativeTo = Enum.ActuatorRelativeTo.World
 		av.AngularVelocity = Vector3.zero
@@ -1505,7 +1402,6 @@ return function(context)
 			at = a,
 			lv = lv,
 			av = av,
-			suspended = awaiting_ownership or nil,
 			integral = Vector3.zero,
 			claim_t = time(),
 			id = x6.part_id_counter,
@@ -1756,7 +1652,7 @@ return function(context)
 	x4.refresh_core_visual = refresh_core_visual
 
 	function x4.f4(pos)
-		if x6.torn_down or not ShapePhysics.finite_vector(pos) then return end
+		if x6.torn_down then return  end
 		if x6.b then
 			v6:Create(x6.b, TweenInfo.new(x9.c7), { Position = pos }):Play()
 			return
@@ -1805,16 +1701,9 @@ return function(context)
 		table.insert(
 			x6.run_connections,
 			v4.DescendantAdded:Connect(function(v)
-				if not x6.torn_down and x6.o and v:IsA("BasePart") then
+				if v:IsA("BasePart") then
 					table.insert(x6.claim_queue, v)
 				end
-			end)
-		)
-		table.insert(
-			x6.run_connections,
-			v4.DescendantRemoving:Connect(function(v)
-				unwatch_anchored(v)
-				deferred_claims[v] = nil
 			end)
 		)
 		x6.o = true
@@ -1830,8 +1719,8 @@ return function(context)
 		table.insert(
 			x6.run_connections,
 			v3.Heartbeat:Connect(function(real_dt)
-				f4(real_dt)
 				f3(real_dt)
+				f4(real_dt)
 				x4.ProcessQueue()
 			end)
 		)
@@ -1851,7 +1740,6 @@ return function(context)
 			x4.f2(arr[k], true, k)
 		end
 		table.clear(x6.claim_queue)
-		clear_pending_claims()
 		x7.n("Sys", released .. " parts released", 2)
 	end
 
@@ -2313,7 +2201,6 @@ return function(context)
 	-- meantime. Enabling reverses both halves. Hoisted out of the loop below so a
 	-- 5000 part toggle does not allocate a closure per part for pcall.
 	local function apply_disabled_part(p, d, disabled)
-		if d.suspended then ShapePhysics.suspend(d) end
 		if d.free_physics then ShapePhysics.apply(p, d, x1); return end
 		if d.lv then
 			d.lv.MaxForce = disabled and 0 or x1.k4
@@ -2418,7 +2305,6 @@ return function(context)
 
 	function x4.f5()
 		x6.o, x6.d = false, false
-		clear_pending_claims()
 		if x4.restore_environment then x4.restore_environment() end
 		if x6.mobile_reset then x6.mobile_reset() end
 		-- Before the core folder goes, so a shape-owned instance living inside it is
