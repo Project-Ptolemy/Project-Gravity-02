@@ -1,5 +1,11 @@
 # Changelog
 
+## November 1, 2026 - Unanchored map part discovery
+
+- Watch eligible anchored map parts for `Anchored` changes and queue them as soon as they become loose, including parts added after the initial scan, on desktop and mobile.
+- Preserve scan candidates while the part-count limit is full. Disconnect anchor listeners when parts leave Workspace, are claimed, or the session is released, reset or unloaded.
+- Add a regression for picking up map parts after they unanchor without pressing Q, with busy scans, intact joints, part limits, pooled parts and lifecycle cleanup.
+
 ## November 1, 2026 - Debris collection recovery
 
 - Retry detached debris during busy workspace scans with a bounded FIFO budget, without rescanning its children. Keep deferred candidates eligible while the part-count limit is full and clear retries on release/reset.

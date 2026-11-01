@@ -21,7 +21,28 @@ return function(context)
 	-- live in the records so retrying never needs a full-population sweep.
 	local deferred_claims = setmetatable({}, { __mode = "k" })
 	local deferred_queue = setmetatable({}, { __mode = "v" })
+	local anchored_claims = setmetatable({}, { __mode = "k" })
 	local deferred_head, deferred_tail
+	local function unwatch_anchored(part)
+		local connection = anchored_claims[part]
+		if not connection then return end
+		anchored_claims[part] = nil
+		connection:Disconnect()
+	end
+	local function watch_anchored(part)
+		if anchored_claims[part] then return end
+		-- Anchored changes do not fire DescendantAdded. Wait for the property
+		-- instead of filling the retry FIFO with the map's stationary parts.
+		local connection
+		connection = part:GetPropertyChangedSignal("Anchored"):Connect(function()
+			if anchored_claims[part] ~= connection or part.Anchored then return end
+			unwatch_anchored(part)
+			if not x6.torn_down and x6.o and part:IsDescendantOf(v4) then
+				x6.claim_queue[#x6.claim_queue + 1] = part
+			end
+		end)
+		anchored_claims[part] = connection
+	end
 	local function defer_claim(part)
 		if deferred_claims[part] then return end
 		local record = { ready = time() + 0.5 }
@@ -30,11 +51,13 @@ return function(context)
 		if deferred_tail then deferred_tail.next = record else deferred_head = record end
 		deferred_tail = record
 	end
-	local function clear_deferred()
+	local function clear_pending_claims()
+		for part in pairs(anchored_claims) do unwatch_anchored(part) end
 		table.clear(deferred_claims)
 		table.clear(deferred_queue)
 		deferred_head, deferred_tail = nil, nil
 	end
+	x4.clear_pending_claims = clear_pending_claims
 	local ANTI_SLEEP = Vector3.new(0, 0.01, 0)
 	local ZERO_VECTOR = Vector3.zero
 	local LIGHT_PHYSICS = PhysicalProperties.new(0.001, 0, 0, 0, 0)
@@ -322,11 +345,11 @@ return function(context)
 	end
 	x7.rule_reject = rule_reject
 
-	function x7.e(p)
+	function x7.e(p, ignore_anchored)
 		if not p:IsA("BasePart") then
 			return true
 		end
-		if p.Anchored then
+		if p == x6.b or (p.Anchored and not ignore_anchored) then
 			return true
 		end
 		if EXCLUDED_NAMES[p.Name] then
@@ -1341,8 +1364,8 @@ return function(context)
 					n = n + 1
 					queue[n] = child
 				end
-				if instance:IsA("BasePart") and (cap <= 0 or x6.n < cap) then
-					if x4.f1(instance) then
+				if instance:IsA("BasePart") then
+					if x4.f1(instance, cap) then
 						claimed = claimed + 1
 					end
 				end
@@ -1394,9 +1417,20 @@ return function(context)
 		end
 	end
 
-	function x4.f1(p)
+	function x4.f1(p, claim_cap)
 		if x6.torn_down then return false end
-		if not p:IsA("BasePart") or x7.e(p) or x6.a[p] then
+		if not p:IsA("BasePart") or x6.a[p] or x7.e(p, true) then
+			return false
+		end
+		if p.Anchored then
+			watch_anchored(p)
+			return false
+		end
+		unwatch_anchored(p)
+		-- Scan candidates must survive a full limit, including parts that just
+		-- unanchored. Explicit Part Control claims retain their existing behavior.
+		if claim_cap and claim_cap > 0 and x6.n >= claim_cap then
+			defer_claim(p)
 			return false
 		end
 		local old_attachment = p:FindFirstChild("GRV_ATT")
@@ -1761,9 +1795,16 @@ return function(context)
 		table.insert(
 			x6.run_connections,
 			v4.DescendantAdded:Connect(function(v)
-				if v:IsA("BasePart") then
+				if not x6.torn_down and x6.o and v:IsA("BasePart") then
 					table.insert(x6.claim_queue, v)
 				end
+			end)
+		)
+		table.insert(
+			x6.run_connections,
+			v4.DescendantRemoving:Connect(function(v)
+				unwatch_anchored(v)
+				deferred_claims[v] = nil
 			end)
 		)
 		x6.o = true
@@ -1800,7 +1841,7 @@ return function(context)
 			x4.f2(arr[k], true, k)
 		end
 		table.clear(x6.claim_queue)
-		clear_deferred()
+		clear_pending_claims()
 		x7.n("Sys", released .. " parts released", 2)
 	end
 
@@ -2367,7 +2408,7 @@ return function(context)
 
 	function x4.f5()
 		x6.o, x6.d = false, false
-		clear_deferred()
+		clear_pending_claims()
 		if x4.restore_environment then x4.restore_environment() end
 		if x6.mobile_reset then x6.mobile_reset() end
 		-- Before the core folder goes, so a shape-owned instance living inside it is
