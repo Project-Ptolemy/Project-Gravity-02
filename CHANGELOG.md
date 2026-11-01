@@ -1,5 +1,11 @@
 # Changelog
 
+## November 1, 2026 - Debris collection recovery
+
+- Retry detached debris during busy workspace scans with a bounded FIFO budget, without rescanning its children. Keep deferred candidates eligible while the part-count limit is full and clear retries on release/reset.
+- Check live joint endpoints and active force actuators instead of rejecting every joint entry. Handle disabled, broken and self-connected remnants while preserving intact vehicles and mechanisms on desktop and mobile.
+- Cover attachment ancestry, foreign actuators, collection during scan backlogs, part-count limits and deferred cleanup in the physics regressions.
+
 ## October 30, 2026 - Part ownership acquisition
 
 - Prepare eligible loose debris while network ownership is pending instead of waiting for the workspace scan to drain before retrying. Keep its actuators disabled until ownership arrives, then resume through the normal update loop on desktop and mobile.

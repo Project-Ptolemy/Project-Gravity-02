@@ -169,8 +169,9 @@ physics, network ownership and available debris affect the in-game result.
 
 Joined vehicle parts and mechanisms are left intact so independent movement
 forces cannot fight their joints. Debris becomes eligible automatically after
-it detaches. Ownership handoffs and invalid physics updates suspend our forces
-until the part recovers. Predictive tracking leads horizontal movement while
+it detaches, including during busy workspace scans. Deferred debris remains
+eligible when the part-count limit is raised. Ownership handoffs and invalid
+physics updates suspend our forces until the part recovers. Predictive tracking leads horizontal movement while
 keeping the ball at the character's actual height through jumps and landings.
 
 **Max Speed** now caps every held-part velocity, including exact-target shapes,

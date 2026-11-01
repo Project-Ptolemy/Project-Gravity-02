@@ -17,8 +17,24 @@ return function(context)
 		for p, d in pairs(x6.a) do ShapePhysics.apply_collisions(p, d, x1) end
 	end
 	local x7 = {}
+	-- Deduplicate candidates without keeping discarded parts alive. FIFO links
+	-- live in the records so retrying never needs a full-population sweep.
 	local deferred_claims = setmetatable({}, { __mode = "k" })
-	local deferred_at = 0
+	local deferred_queue = setmetatable({}, { __mode = "v" })
+	local deferred_head, deferred_tail
+	local function defer_claim(part)
+		if deferred_claims[part] then return end
+		local record = { ready = time() + 0.5 }
+		deferred_claims[part] = record
+		deferred_queue[record] = part
+		if deferred_tail then deferred_tail.next = record else deferred_head = record end
+		deferred_tail = record
+	end
+	local function clear_deferred()
+		table.clear(deferred_claims)
+		table.clear(deferred_queue)
+		deferred_head, deferred_tail = nil, nil
+	end
 	local ANTI_SLEEP = Vector3.new(0, 0.01, 0)
 	local ZERO_VECTOR = Vector3.zero
 	local LIGHT_PHYSICS = PhysicalProperties.new(0.001, 0, 0, 0, 0)
@@ -832,7 +848,7 @@ return function(context)
 				if not ShapePhysics.can_drive(p, d.lv, d.av) then
 					-- A weld/seat/hinge can be added after the original claim.
 					-- Restore this part without changing its assembly's velocity.
-					deferred_claims[p] = true
+					defer_claim(p)
 					d.original_anchored = p.Anchored
 					x4.f2(p, false, k)
 					continue
@@ -1275,26 +1291,12 @@ return function(context)
 	function x4.ProcessQueue()
 		if x6.torn_down then return  end
 		local queue = x6.claim_queue
-		-- Vehicle joints can break without a DescendantAdded event. Once the
-		-- current sweep drains, retry blocked candidates through the same budget.
-		local now = time()
-		if #queue == 0 and now - deferred_at >= 0.5 then
-			deferred_at = now
-			for part in pairs(deferred_claims) do
-				deferred_claims[part] = nil
-				if part.Parent then queue[#queue + 1] = part end
-			end
-		end
 		-- Luau's # is a binary search, not a stored field, and the old loop paid
 		-- for it four times per item (the while test, the read, the clear, and
 		-- once inside every table.insert). Carrying the length in a local drops
 		-- all of them. This runs every frame during the initial workspace sweep,
 		-- when the queue is thousands of entries deep, so it is the difference
 		-- between a smooth start and a stutter.
-		local n = #queue
-		if n == 0 then
-			return
-		end
 		-- The budget is the claim throttle, and a throttle is the trade Max Fidelity
 		-- refuses: it spends a smooth start to have every part in hand sooner. The
 		-- three ceilings stay finite so a queue of a hundred thousand descendants
@@ -1312,6 +1314,29 @@ return function(context)
 		-- rest of the session -- including every part inside them if the ceiling is later
 		-- raised. Descendants keep being enumerated either way.
 		local cap = x1.TargetParts or 0
+		-- Joint changes need no DescendantAdded event. Reserve a bounded slice of
+		-- the existing budget for FIFO retries, even while traversal stays busy.
+		-- A retry visits only the part; its children were already enumerated.
+		local now = time()
+		local retry_processed = max_fid and 400 or 20
+		local retry_claimed = max_fid and 40 or 2
+		while deferred_head and (cap <= 0 or x6.n < cap) do
+			if processed >= retry_processed or claimed >= retry_claimed or os.clock() - start > cap_seconds * 0.25 then break end
+			local record = deferred_head
+			local part = deferred_queue[record]
+			local pending = part and deferred_claims[part] == record
+			if pending and record.ready > now then break end
+			deferred_queue[record] = nil
+			deferred_head = record.next
+			if not deferred_head then deferred_tail = nil end
+			record.next = nil
+			processed = processed + 1
+			if pending then
+				deferred_claims[part] = nil
+				if part:IsDescendantOf(v4) and x4.f1(part) then claimed = claimed + 1 end
+			end
+		end
+		local n = #queue
 		while n > 0 do
 			if processed >= cap_processed or claimed >= cap_claimed or os.clock() - start > cap_seconds then
 				break
@@ -1387,7 +1412,7 @@ return function(context)
 		local old_linear_velocity = p:FindFirstChild("GRV_LV")
 		local old_angular_velocity = p:FindFirstChild("GRV_AV")
 		if not ShapePhysics.valid_motion(p) or not ShapePhysics.can_drive(p, old_linear_velocity, old_angular_velocity) then
-			deferred_claims[p] = true
+			defer_claim(p)
 			return false
 		end
 		-- Register loose debris while ownership is pending so the normal density
@@ -1785,7 +1810,7 @@ return function(context)
 			x4.f2(arr[k], true, k)
 		end
 		table.clear(x6.claim_queue)
-		table.clear(deferred_claims)
+		clear_deferred()
 		x7.n("Sys", released .. " parts released", 2)
 	end
 
@@ -2352,7 +2377,7 @@ return function(context)
 
 	function x4.f5()
 		x6.o, x6.d = false, false
-		table.clear(deferred_claims)
+		clear_deferred()
 		if x4.restore_environment then x4.restore_environment() end
 		if x6.mobile_reset then x6.mobile_reset() end
 		-- Before the core folder goes, so a shape-owned instance living inside it is

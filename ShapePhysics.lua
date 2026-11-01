@@ -31,15 +31,49 @@ end
 
 -- Shapes assign independent destinations. Applying those forces to welded
 -- vehicle panels or hinged wheels makes them fight their existing mechanism.
--- GetJoints includes active constraints even when parented somewhere else.
+-- GetJoints can include constraints parented elsewhere. Check their endpoints
+-- rather than treating every returned instance as a connection to another part.
+local function attachment_part(attachment)
+	return attachment and attachment:FindFirstAncestorWhichIsA("BasePart")
+end
+
+local function joint_drives(joint, part)
+	local rigid = joint:IsA("JointInstance") or joint:IsA("WeldConstraint")
+	if not rigid and not joint:IsA("Constraint") then return false end
+	if joint.Enabled == false or joint.Active == false then return false end
+	if rigid then
+		local first, second = joint.Part0, joint.Part1
+		return first and second and first ~= second and first.Parent and second.Parent
+			and (first == part or second == part)
+	end
+	local first, second = attachment_part(joint.Attachment0), attachment_part(joint.Attachment1)
+	local class = joint.ClassName
+	-- These actuators drive Attachment0 independently of a second part.
+	if class == "LinearVelocity" or class == "VectorForce" or class == "Torque" then return first == part end
+	if class == "AngularVelocity" then
+		return first == part or (second == part and first and joint.ReactionTorqueEnabled
+			and joint.RelativeTo == Enum.ActuatorRelativeTo.Attachment1)
+	end
+	if (class == "AlignPosition" and joint.Mode == Enum.PositionAlignmentMode.OneAttachment)
+		or (class == "AlignOrientation" and joint.Mode == Enum.OrientationAlignmentMode.OneAttachment) then
+		return first == part
+	end
+	if class == "AlignPosition" or class == "AlignOrientation" then
+		return first and second and first.Parent and second.Parent and (first == part or second == part)
+	end
+	if first and second and first ~= second and first.Parent and second.Parent
+		and (first == part or second == part) then return true end
+	return false
+end
+
 function M.can_drive(part, linear, angular)
 	local root = part.AssemblyRootPart
 	if part.Anchored or (root and root ~= part) then return false end
 	for _, joint in ipairs(part:GetJoints()) do
-		if joint ~= linear and joint ~= angular then return false end
+		if joint ~= linear and joint ~= angular and joint_drives(joint, part) then return false end
 	end
 	for _, child in ipairs(part:GetChildren()) do
-		if child:IsA("BodyMover") then return false end
+		if child ~= linear and child ~= angular and (child:IsA("BodyMover") or joint_drives(child, part)) then return false end
 	end
 	return true
 end
