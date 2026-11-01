@@ -24,73 +24,6 @@ function M.clamp_velocity(value, limit)
 	return value
 end
 
-function M.valid_motion(part)
-	return M.finite_vector(part.Position) and M.finite_vector(part.AssemblyLinearVelocity)
-		and M.finite_vector(part.AssemblyAngularVelocity)
-end
-
--- Shapes assign independent destinations. Applying those forces to welded
--- vehicle panels or hinged wheels makes them fight their existing mechanism.
--- GetJoints can include constraints parented elsewhere. Check their endpoints
--- rather than treating every returned instance as a connection to another part.
-local function attachment_part(attachment)
-	return attachment and attachment:FindFirstAncestorWhichIsA("BasePart")
-end
-
-local function joint_drives(joint, part)
-	local rigid = joint:IsA("JointInstance") or joint:IsA("WeldConstraint")
-	if not rigid and not joint:IsA("Constraint") then return false end
-	if joint.Enabled == false or joint.Active == false then return false end
-	if rigid then
-		local first, second = joint.Part0, joint.Part1
-		return first and second and first ~= second and first.Parent and second.Parent
-			and (first == part or second == part)
-	end
-	local first, second = attachment_part(joint.Attachment0), attachment_part(joint.Attachment1)
-	local class = joint.ClassName
-	-- These actuators drive Attachment0 independently of a second part.
-	if class == "LinearVelocity" or class == "VectorForce" or class == "Torque" then return first == part end
-	if class == "AngularVelocity" then
-		return first == part or (second == part and first and joint.ReactionTorqueEnabled
-			and joint.RelativeTo == Enum.ActuatorRelativeTo.Attachment1)
-	end
-	if (class == "AlignPosition" and joint.Mode == Enum.PositionAlignmentMode.OneAttachment)
-		or (class == "AlignOrientation" and joint.Mode == Enum.OrientationAlignmentMode.OneAttachment) then
-		return first == part
-	end
-	if class == "AlignPosition" or class == "AlignOrientation" then
-		return first and second and first.Parent and second.Parent and (first == part or second == part)
-	end
-	if first and second and first ~= second and first.Parent and second.Parent
-		and (first == part or second == part) then return true end
-	return false
-end
-
-function M.can_drive(part, linear, angular)
-	local root = part.AssemblyRootPart
-	if part.Anchored or (root and root ~= part) then return false end
-	for _, joint in ipairs(part:GetJoints()) do
-		if joint ~= linear and joint ~= angular and joint_drives(joint, part) then return false end
-	end
-	for _, child in ipairs(part:GetChildren()) do
-		if child ~= linear and child ~= angular and (child:IsA("BodyMover") or joint_drives(child, part)) then return false end
-	end
-	return true
-end
-
--- Keep the core at the character's real height. Extrapolating downward
--- velocity put it below the floor during a jump, then snapped it back on
--- landing. The horizontal lead still compensates for movement and latency.
-function M.predict_position(root, factor)
-	local pos = root.Position
-	if not M.finite_vector(pos) then return nil end
-	local vel = root.AssemblyLinearVelocity
-	if not M.finite_vector(vel) then return pos end
-	if type(factor) ~= "number" or factor ~= factor or math.abs(factor) == math.huge then factor = 150 end
-	local lead = M.clamp_velocity(Vector3.new(vel.X, 0, vel.Z), 250)
-	return pos + lead * (math.clamp(factor, 0, 500) / 1000)
-end
-
 -- A callback can fail only for a particular part or return invalid arithmetic.
 -- Guard every invocation so one imported module cannot abort the whole sweep.
 function M.evaluate(callback, part, center, data, clock, config, settings, state, constants)
@@ -136,28 +69,8 @@ function M.park(d)
 	if d.av then d.av.AngularVelocity = Vector3.zero end
 end
 
--- A zero velocity at unlimited force is still an active brake. Ownership
--- handoffs and invalid world state must disable actuators, then discard their
--- old feedback before they can be rearmed.
-function M.suspend(d)
-	M.park(d)
-	if d.lv then d.lv.Enabled = false end
-	if d.av then d.av.Enabled = false end
-	d.suspended = true
-end
-
-function M.resume(d, x1)
-	if not d.suspended then return end
-	d.suspended = nil
-	M.park(d)
-	local drive = not x1.Disabled and not d.free_active
-	if d.lv then d.lv.Enabled = drive; d.lv.MaxForce = drive and x1.k4 or 0 end
-	if d.av then d.av.Enabled = drive; d.av.MaxTorque = drive and math.huge or 0 end
-end
-
 function M.apply(p, d, x1)
 	local free = d.free_physics == true
-	if d.suspended then return free end
 	local resumed = false
 	if free and not d.free_active then
 		d.free_active = true

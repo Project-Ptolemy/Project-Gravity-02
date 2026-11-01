@@ -167,14 +167,6 @@ also save an exported `.lua` file in `GravityShapes` and restart Project Gravity
 The preview is a geometry editor; Roblox's live
 physics, network ownership and available debris affect the in-game result.
 
-Joined vehicle parts and mechanisms are left intact so independent movement
-forces cannot fight their joints. Debris becomes eligible automatically after
-it unanchors or detaches, including during busy workspace scans, without a
-map refresh or reset. Scanned debris remains eligible when the part-count limit
-is raised. Ownership handoffs and invalid
-physics updates suspend our forces until the part recovers. Predictive tracking leads horizontal movement while
-keeping the ball at the character's actual height through jumps and landings.
-
 **Max Speed** now caps every held-part velocity, including exact-target shapes,
 Point Impact and water lift. Per-part speed overrides still take precedence.
 Fast formations may need a higher setting to reach their intended motion.
@@ -255,9 +247,6 @@ python tools/test_luau.py --luau PATH_TO_LUAU tests/custom_shapes.lua
 python tools/test_luau.py --luau PATH_TO_LUAU tests/custom_shape_editor.lua
 python tools/test_luau.py --luau PATH_TO_LUAU tests/loader_shapes.lua
 python tools/test_luau.py --luau PATH_TO_LUAU tests/physics_robustness.lua
-python tools/test_luau.py --luau PATH_TO_LUAU tests/physics_assemblies.lua
-python tools/test_luau.py --luau PATH_TO_LUAU tests/physics_discovery.lua
-python tools/test_luau.py --luau PATH_TO_LUAU tests/core_tracking.lua
 python tools/test_luau.py --luau PATH_TO_LUAU tests/insane_shapes_smoke.lua
 python tools/test_luau.py --luau PATH_TO_LUAU tests/math_curves_smoke.lua
 python tools/test_luau.py --luau PATH_TO_LUAU tests/formation_smoke.lua

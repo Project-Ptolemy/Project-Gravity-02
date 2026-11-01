@@ -657,7 +657,6 @@ local function destroy()
 	-- cleanup sweep further down is never cleaned up at all.
 	x6.torn_down = true
 	if context.x8 and context.x8.unbind_all then pcall(context.x8.unbind_all) end
-	if context.x4 and context.x4.clear_pending_claims then pcall(context.x4.clear_pending_claims) end
 	if context.x4 and context.x4.restore_environment then pcall(context.x4.restore_environment) end
 	if context.x5 and context.x5.restore_perf then pcall(context.x5.restore_perf) end
 	if x6.mobile_cleanup then pcall(x6.mobile_cleanup) end
